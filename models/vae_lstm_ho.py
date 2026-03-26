@@ -1,17 +1,20 @@
+import sys
+import warnings
+from pathlib import Path
+from typing import List, Optional, Tuple, Type
+
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from edl_pytorch import NormalInvGamma
+from torch.distributions import Laplace
+from torch.func import vmap
+from yacs.config import CfgNode as CN
+
 from common import *
 from hrnet3D_config import *
 from hrnet3D_config_4D import MODEL_CONFIGS as cfg_4D
-from yacs.config import CfgNode as CN
-import torch
-from edl_pytorch import NormalInvGamma
-from torch.distributions import Laplace
 from transformer import Transformer
-from torch.func import vmap
-import sys
-from pathlib import Path
-import warnings
 
 # Add parent directory to path to import from tools
 sys.path.append(str(Path(__file__).parent.parent))
@@ -20,16 +23,16 @@ from tools.config import *
 class HighResolutionModule(nn.Module):
     def __init__(
         self,
-        num_branches,
-        blocks,
-        num_blocks,
-        num_inchannels,
-        num_channels,
-        fuse_method,
-        multi_scale_output=True,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        num_branches: int,
+        blocks: Type[nn.Module],
+        num_blocks: List[int],
+        num_inchannels: List[int],
+        num_channels: List[int],
+        fuse_method: str,
+        multi_scale_output: bool = True,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> None:
         super(HighResolutionModule, self).__init__()
         self._check_branches(
             num_branches, blocks, num_blocks, num_inchannels, num_channels
@@ -55,8 +58,8 @@ class HighResolutionModule(nn.Module):
         self.relu = nn.ReLU(inplace=False)
 
     def _check_branches(
-        self, num_branches, blocks, num_blocks, num_inchannels, num_channels
-    ):
+        self, num_branches: int, blocks: Type[nn.Module], num_blocks: List[int], num_inchannels: List[int], num_channels: List[int]
+    ) -> None:
         if num_branches != len(num_blocks):
             error_msg = "NUM_BRANCHES({}) <> NUM_BLOCKS({})".format(
                 num_branches, len(num_blocks)
@@ -80,14 +83,14 @@ class HighResolutionModule(nn.Module):
 
     def _make_one_branch(
         self,
-        branch_index,
-        block,
-        num_blocks,
-        num_channels,
-        stride=1,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        branch_index: int,
+        block: Type[nn.Module],
+        num_blocks: List[int],
+        num_channels: List[int],
+        stride: int = 1,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> nn.Sequential:
         downsample = None
         if (
             stride != 1
@@ -130,8 +133,8 @@ class HighResolutionModule(nn.Module):
         return nn.Sequential(*layers)
 
     def _make_branches(
-        self, num_branches, block, num_blocks, num_channels, bn_type, bn_momentum=0.1
-    ):
+        self, num_branches: int, block: Type[nn.Module], num_blocks: List[int], num_channels: List[int], bn_type: Optional[str] = None, bn_momentum: float = 0.1
+    ) -> nn.ModuleList:
         branches = []
         for i in range(num_branches):
             branches.append(
@@ -147,7 +150,7 @@ class HighResolutionModule(nn.Module):
 
         return nn.ModuleList(branches)
 
-    def _make_fuse_layers(self, bn_type, bn_momentum=0.1):
+    def _make_fuse_layers(self, bn_type: Optional[str], bn_momentum: float = 0.1) -> Optional[nn.ModuleList]:
         if self.num_branches == 1:
             return None
         num_branches = self.num_branches
@@ -214,10 +217,10 @@ class HighResolutionModule(nn.Module):
 
         return nn.ModuleList(fuse_layers)
 
-    def get_num_inchannels(self):
+    def get_num_inchannels(self) -> List[int]:
         return self.num_inchannels
 
-    def forward(self, x):
+    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         if self.num_branches == 1:
             return [self.branches[0](x[0])]
 
@@ -247,7 +250,7 @@ class HighResolutionModule(nn.Module):
 
 
 class HighResolution3DNet(nn.Module):
-    def __init__(self, cfg, bn_type=None, bn_momentum=None, **kwargs):
+    def __init__(self, cfg: dict, bn_type: Optional[str] = None, bn_momentum: Optional[float] = None, **kwargs: bool) -> None:
         super(HighResolution3DNet, self).__init__()
         if kwargs['full_res_stem']:
             self.full_res_stem = kwargs['full_res_stem']
@@ -299,8 +302,8 @@ class HighResolution3DNet(nn.Module):
             )
 
     def _make_transition_layer(
-        self, num_channels_pre_layer, num_channels_cur_layer, bn_type, bn_momentum
-    ):
+        self, num_channels_pre_layer: List[int], num_channels_cur_layer: List[int], bn_type: Optional[str], bn_momentum: Optional[float]
+    ) -> nn.ModuleList:
         num_branches_cur = len(num_channels_cur_layer)
         num_branches_pre = len(num_channels_pre_layer)
         transition_layers = []
@@ -347,12 +350,12 @@ class HighResolution3DNet(nn.Module):
 
     def _make_stage(
         self,
-        layer_config,
-        num_inchannels,
-        multi_scale_output=True,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        layer_config: dict,
+        num_inchannels: List[int],
+        multi_scale_output: bool = True,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> Tuple[nn.Sequential, List[int]]:
         num_modules = layer_config["NUM_MODULES"]
         num_branches = layer_config["NUM_BRANCHES"]
         num_blocks = layer_config["NUM_BLOCKS"]
@@ -385,7 +388,7 @@ class HighResolution3DNet(nn.Module):
 
         return nn.Sequential(*modules), num_inchannels
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         x = self.layer1(x)
         x_list = []
         for i in range(self.stage2_cfg["NUM_BRANCHES"]):
@@ -415,7 +418,7 @@ class HighResolution3DNet(nn.Module):
     
 
 class ResidualMLP(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
         self.block = nn.Sequential(
             nn.Linear(dim, dim // 2),
@@ -423,11 +426,13 @@ class ResidualMLP(nn.Module):
             nn.Linear(dim // 2, dim)
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x + self.block(x)
     
 class RadProPoserVAE(nn.Module):
-    def __init__(self):
+    """VAE-based radar pose estimator with Gaussian latent space and ensemble sampling."""
+
+    def __init__(self) -> None:
         super(RadProPoserVAE, self).__init__()
 
         # backbone 
@@ -499,39 +504,39 @@ class RadProPoserVAE(nn.Module):
         return dist.rsample()
 
     
-    def preProcess(self, 
-                   x: torch.Tensor):
+    def preProcess(self,
+                   x: torch.Tensor) -> torch.Tensor:
         x = x - torch.mean(x, dim = -1, keepdim = True)
         x = torch.fft.fft(torch.fft.fft(torch.fft.fft(torch.fft.fft(x ,dim = -1,  norm = "forward"), dim = -2,  norm = "forward"), dim = -3,  norm = "forward"), dim = -4,  norm = "forward")
-        x = x.permute(0, 1, 5, 2, 3, 4) 
+        x = x.permute(0, 1, 5, 2, 3, 4)
         return x
 
-    def applyBackbone(self, x: torch.Tensor):
+    def applyBackbone(self, x: torch.Tensor) -> torch.Tensor:
         # get features
         featureList = self.backbone(x)
 
         # interpolate to same size
         features = []
         for feature in featureList:
-            
+
             helper = F.interpolate(feature.float(), size=(4, 4, 64), mode='trilinear')
             features.append(helper)
-        
+
         features = torch.cat(features, dim = 1)
         features = self.bottleNeck(features)
 
         return features
-    
-    def sampleLatent(self, 
-                     mu: torch.Tensor, 
-                     logvar: torch.Tensor, 
-                     alpha: float = None)->torch.Tensor:
+
+    def sampleLatent(self,
+                     mu: torch.Tensor,
+                     logvar: torch.Tensor,
+                     alpha: Optional[float] = None) -> torch.Tensor:
         if alpha != None:
             self.varianceScaling = torch.tensor(alpha)
         out = self.sample(mu, logvar)
         return out
-    
-    def getLatent(self, x: torch.Tensor)-> tuple[torch.Tensor, torch.Tensor]:
+
+    def getLatent(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # fft layer 
         #x = self.preProcess(x) # watch out with batch = 1
         device = x.device
@@ -553,10 +558,10 @@ class RadProPoserVAE(nn.Module):
         
         return mu, logvar
     
-    def forward(self, 
-                x: torch.Tensor, 
-                return_samples: bool = False):
-        # fft layer 
+    def forward(self,
+                x: torch.Tensor,
+                return_samples: bool = False) -> Tuple[Optional[torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        # fft layer
         x = self.preProcess(x) # watch out with batch = 1
         device = x.device
 
@@ -567,18 +572,18 @@ class RadProPoserVAE(nn.Module):
             for i in range(elmt.size(1)):
                 helper = self.applyBackbone(elmt[:,i].float())
                 spatFeat.append(helper)
-        
+
         # process with ransformer layer
         spatiotemp = torch.stack(spatFeat, dim = 1)
         spatiotemp = self.former(spatiotemp).flatten(start_dim = 1, end_dim = -1)
 
-        # get latent 
+        # get latent
         mu = self.mu(spatiotemp)
 
         if self.latent_dist == "laplace":
             b_latent = self.spread(spatiotemp)
             samples = self.decoder(torch.stack([self.sample_laplace(mu, b_latent) for i in range(self.Nsamples)], dim = 1))
-            
+
             muOut = torch.mean(samples, dim = 1)
             varOut = torch.var(samples, dim = 1)
 
@@ -586,13 +591,13 @@ class RadProPoserVAE(nn.Module):
 
             if return_samples:
                 return samples, mu, b_latent, muOut, varOut
-            else: 
+            else:
                 return None, mu, b_latent, muOut, varOut
 
         else: # gaussian
             logvar = self.spread(spatiotemp)
             samples = self.decoder(torch.stack([self.sample(mu, logvar, device = device) for i in range(self.Nsamples)], dim = 1))
-        
+
             muOut = torch.mean(samples, dim = 1)
             varOut = torch.var(samples, dim = 1)
 
@@ -600,12 +605,12 @@ class RadProPoserVAE(nn.Module):
 
             if return_samples:
                 return samples, mu, logvar, muOut, varOut
-            else: 
+            else:
                 return None, mu, logvar, muOut, varOut
-            
-    def forward_inference(self, 
+
+    def forward_inference(self,
                       x: torch.Tensor,
-                      return_samples: bool = False):
+                      return_samples: bool = False) -> Tuple[Optional[torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Optimized forward for inference with batch_size=1.
         - Batches all backbone calls into single forward pass
@@ -681,7 +686,9 @@ class RadProPoserVAE(nn.Module):
                 return None, mu, logvar, muOut, varOut
 
 class RadProPoserVAECov(nn.Module):
-    def __init__(self):
+    """VAE-based radar pose estimator with full covariance estimation via ensemble sampling."""
+
+    def __init__(self) -> None:
         super(RadProPoserVAECov, self).__init__()
 
         # backbone 
@@ -722,51 +729,51 @@ class RadProPoserVAECov(nn.Module):
         eps = torch.randn_like(std).to(device) * self.varianceScaling 
         return mu + eps * std
     
-    def preProcess(self, 
-                   x: torch.Tensor):
+    def preProcess(self,
+                   x: torch.Tensor) -> torch.Tensor:
         x = x - torch.mean(x, dim = -1, keepdim = True)
         x = torch.fft.fft(torch.fft.fft(torch.fft.fft(torch.fft.fft(x ,dim = -1,  norm = "forward"), dim = -2,  norm = "forward"), dim = -3,  norm = "forward"), dim = -4,  norm = "forward")
-        x = x.permute(0, 1, 5, 2, 3, 4) 
+        x = x.permute(0, 1, 5, 2, 3, 4)
         return x
 
-    def applyBackbone(self, x: torch.Tensor):
+    def applyBackbone(self, x: torch.Tensor) -> torch.Tensor:
         # get features
         featureList = self.backbone(x)
 
         # interpolate to same size
         features = []
         for feature in featureList:
-            
+
             helper = F.interpolate(feature.float(), size=(4, 4, 64), mode='trilinear')
             features.append(helper)
-        
+
         features = torch.cat(features, dim = 1)
         features = self.bottleNeck(features)
 
         return features
-    
-    def sampleLatent(self, 
-                     mu: torch.Tensor, 
-                     logvar: torch.Tensor, 
-                     alpha: float = None)->torch.Tensor:
+
+    def sampleLatent(self,
+                     mu: torch.Tensor,
+                     logvar: torch.Tensor,
+                     alpha: Optional[float] = None) -> torch.Tensor:
         if alpha != None:
             self.varianceScaling = torch.tensor(alpha)
         out = self.sample(mu, logvar)
         return out
-    
-    def ensemble_stats(self, preds: torch.Tensor):
+
+    def ensemble_stats(self, preds: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        preds  : (B, K, E)  –  batch × features/keypoints × ensemble samples
+        preds  : (B, K, E)  --  batch x features/keypoints x ensemble samples
         returns:
             mu  : (B, K)
             cov : (B, K, K)
         """
         mu  = preds.mean(dim=2)                               # (B, K)
-        # torch.cov expects (variables, samples) → we feed (K, E) for each batch item
+        # torch.cov expects (variables, samples) -> we feed (K, E) for each batch item
         cov = vmap(lambda x: torch.cov(x, correction=1))(preds)  # (B, K, K)
         return mu, cov
-    
-    def ensemble_stats_var(self, preds: torch.Tensor):
+
+    def ensemble_stats_var(self, preds: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Compute mean and variance over ensemble predictions.
 
@@ -784,7 +791,7 @@ class RadProPoserVAECov(nn.Module):
         var = preds.var(dim=2, unbiased=True)  # (B, K), using Bessel correction (unbiased)
         return mu, var
 
-    def getLatent(self, x: torch.Tensor)-> tuple[torch.Tensor, torch.Tensor]:
+    def getLatent(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         # fft layer 
         #x = self.preProcess(x) # watch out with batch = 1
         device = x.device
@@ -806,10 +813,10 @@ class RadProPoserVAECov(nn.Module):
         
         return mu, logvar
     
-    def forward(self, 
-                x: torch.Tensor, 
-                return_samples: bool = False):
-        # fft layer 
+    def forward(self,
+                x: torch.Tensor,
+                return_samples: bool = False) -> Tuple[Optional[torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        # fft layer
         x = self.preProcess(x) # watch out with batch = 1
         device = x.device
 
@@ -820,16 +827,16 @@ class RadProPoserVAECov(nn.Module):
             for i in range(elmt.size(1)):
                 helper = self.applyBackbone(elmt[:,i].float())
                 spatFeat.append(helper)
-        
+
         # process with ransformer layer
         spatiotemp = torch.stack(spatFeat, dim = 1)
         spatiotemp = self.former(spatiotemp).flatten(start_dim = 1, end_dim = -1)
 
-        # get latent 
+        # get latent
         mu = self.mu(spatiotemp)
         logvar = self.spread(spatiotemp)
 
-        
+
         samples = self.decoder(torch.stack([self.sample(mu, logvar, device = device) for i in range(self.Nsamples)], dim = 1))
 
         samples = samples.permute(0, 2, 1)
@@ -838,12 +845,12 @@ class RadProPoserVAECov(nn.Module):
 
         if return_samples:
             return samples, mu, logvar, muOut, cov
-        else: 
+        else:
             return None, mu, logvar, muOut, cov
-    
-    def forward_inference(self, 
+
+    def forward_inference(self,
                       x: torch.Tensor,
-                      return_samples: bool = False):
+                      return_samples: bool = False) -> Tuple[Optional[torch.Tensor], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Optimized forward for inference with batch_size=1.
         - Batches all backbone calls into single forward pass
@@ -896,25 +903,27 @@ class RadProPoserVAECov(nn.Module):
 
 
 class LSTMModel(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size):
+    """LSTM baseline for temporal radar pose estimation."""
+
+    def __init__(self, input_size: int, hidden_size: int, num_layers: int, output_size: int) -> None:
         super(LSTMModel, self).__init__()
-        
+
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        
+
         # LSTM layer
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        
+
         # Fully connected layer
         self.fc = nn.Linear(hidden_size, output_size)
 
-    def initialize_hidden_state(self, batch_size, device):
+    def initialize_hidden_state(self, batch_size: int, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         # Initialize hidden state (h0) and cell state (c0)
         h0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)  # Hidden state
         c0 = torch.zeros(self.num_layers, batch_size, self.hidden_size).to(device)  # Cell state
         return (h0, c0)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size = x.size(0)
         device = x.device
 
@@ -923,21 +932,23 @@ class LSTMModel(nn.Module):
 
         # LSTM output: (batch_size, seq_length, hidden_size)
         lstm_out, _ = self.lstm(x, (h0, c0))
-        
+
         # Use the output from the last time step
         out = self.fc(lstm_out[:, -1, :])
-        
+
         return out
 
 
 class CNN_LSTM(nn.Module):
-    def __init__(self):
+    """CNN-LSTM baseline combining spatial convolution with temporal LSTM."""
+
+    def __init__(self) -> None:
         super(CNN_LSTM, self).__init__()
 
-        # backbone 
+        # backbone
         self.backbone = HighResolution3DNet(
             MODEL_CONFIGS["hr_tiny_feat64_zyx_l4_in64"], full_res_stem=True)
-        
+
         self.bottleNeck = nn.Sequential(
                 nn.Conv3d(in_channels=384, out_channels=32, kernel_size=(1, 1, 8), stride=(1, 1, 8)),  # 3x3x3 conv
                 nn.BatchNorm3d(32),  # Batch normalization
@@ -950,19 +961,18 @@ class CNN_LSTM(nn.Module):
                 nn.Flatten(start_dim = 1, end_dim = -1)
             )
 
-        
-        # LSTM head 
+        # LSTM head
         self.LSTM = LSTMModel(128, 512, 3, 78)
-    
-    def preProcess(self, 
-                   x: torch.Tensor):
+
+    def preProcess(self,
+                   x: torch.Tensor) -> torch.Tensor:
         x = x - torch.mean(x, dim = -1, keepdim = True)
         x = torch.fft.fft(torch.fft.fft(torch.fft.fft(torch.fft.fft(x ,dim = -1,  norm = "forward"), dim = -2,  norm = "forward"), dim = -3,  norm = "forward"), dim = -4,  norm = "forward")
 
-        x = x.permute(0, 1, 5, 2, 3, 4) 
+        x = x.permute(0, 1, 5, 2, 3, 4)
         return x
 
-    def applyBackbone(self, x: torch.Tensor):
+    def applyBackbone(self, x: torch.Tensor) -> torch.Tensor:
         # get features
         featureList = self.backbone(x)
 
@@ -971,15 +981,15 @@ class CNN_LSTM(nn.Module):
         for feature in featureList:
             helper = F.interpolate(feature.float(), size=(4, 4, 64), mode='trilinear')
             features.append(helper)
-        
+
         features = torch.cat(features, dim = 1)
         features = self.bottleNeck(features)
 
         return features
-    
-    def forward(self, 
-                x: torch.Tensor):
-        # fft layer 
+
+    def forward(self,
+                x: torch.Tensor) -> torch.Tensor:
+        # fft layer
         x = self.preProcess(x) # watch out with batch = 1
 
         # part in real and imag
@@ -989,9 +999,9 @@ class CNN_LSTM(nn.Module):
             for i in range(elmt.size(1)):
                 helper = self.applyBackbone(elmt[:,i].float())
                 spatFeat.append(helper)
-        
+
         # fuse together to get mu and sgm
-        spatiotemp = torch.stack(spatFeat, dim = 1) 
+        spatiotemp = torch.stack(spatFeat, dim = 1)
 
         out = self.LSTM(spatiotemp)
 
@@ -999,15 +1009,17 @@ class CNN_LSTM(nn.Module):
 
 
 class HRRadarPose(nn.Module):
-    def __init__(self):
+    """Deterministic high-resolution radar pose estimator without uncertainty."""
+
+    def __init__(self) -> None:
         super(HRRadarPose, self).__init__()
 
-        # oroginal model by ho et al. 
+        # oroginal model by ho et al.
 
-        # backbone 
+        # backbone
         self.backbone = HighResolution3DNet(
             cfg_4D["hr_tiny_feat64_zyx_l4_in64"], full_res_stem=True)
-        
+
         self.bottleNeck = nn.Sequential(
                 nn.Conv3d(in_channels=64, out_channels=32, kernel_size=(1, 1, 8), stride=(1, 1, 8)),  # 3x3x3 conv
                 nn.BatchNorm3d(32),  # Batch normalization
@@ -1017,25 +1029,24 @@ class HRRadarPose(nn.Module):
                 nn.BatchNorm3d(8),  # Batch normalization
                 nn.ReLU(inplace=True),  # ReLU activation
 
-                nn.Flatten(start_dim = 1, end_dim = -1), 
+                nn.Flatten(start_dim = 1, end_dim = -1),
                 nn.Linear(128, 78)
             )
 
-    def preProcess(self, 
-                   x: torch.Tensor):
+    def preProcess(self,
+                   x: torch.Tensor) -> torch.Tensor:
         x = x - torch.mean(x, dim = -1, keepdim = True)
         x = torch.fft.fft(torch.fft.fft(torch.fft.fft(torch.fft.fft(x ,dim = -1,  norm = "forward"), dim = -2,  norm = "forward"), dim = -3,  norm = "forward"), dim = -4,  norm = "forward")
-        
+
         x = x.permute(0, 4, 1, 2, 3)
-        
+
         return x
-    
-    def applyBackbone(self, x: torch.Tensor):
+
+    def applyBackbone(self, x: torch.Tensor) -> torch.Tensor:
         out = self.backbone(x)
         return out[0]
-    
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.preProcess(x)
         x = torch.cat([x.real, x.imag], dim = 1)
         x = self.bottleNeck(self.applyBackbone(x))
@@ -1044,8 +1055,8 @@ class HRRadarPose(nn.Module):
         offsets = x[:, 1:]
 
         return root, offsets
-    
-    def forward_inference(self, x: torch.Tensor):
+
+    def forward_inference(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward for inference with batch_size=1.
         Note: This model already processes backbone in single pass 

@@ -2,7 +2,7 @@ import json
 import sys
 from functools import partial
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -21,7 +21,7 @@ from config import ANNOT_DIR, MB_CONFIG_PATH, MB_CHECKPOINT_PATH, MB_ROOTREL, PR
 from misc.constants import HUPR_TO_H36M, TEST_SEQUENCES
 
 
-def load_motionbert(device: torch.device) -> tuple[nn.Module, int]:
+def load_motionbert(device: torch.device) -> Tuple[nn.Module, int]:
     """Load MotionBERT model with pretrained weights.
 
     Args:
@@ -77,7 +77,7 @@ def hupr_to_h36m(joints_14: np.ndarray) -> np.ndarray:
     return joints_17
 
 
-def interpolate_jumps(keypoints: np.ndarray, threshold: float = None) -> np.ndarray:
+def interpolate_jumps(keypoints: np.ndarray, threshold: Optional[float] = None) -> np.ndarray:
     """Detect and interpolate frames with unrealistic joint jumps.
 
     Args:

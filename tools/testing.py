@@ -1,12 +1,14 @@
+import os
+import sys
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import os
 from tqdm import tqdm
-import sys
-from config import *
+
 import trainLoop
+from config import *
 
 def get_model_checkpoint_path(model_name: str, testing_epoch: int = None) -> str:
     """
@@ -63,7 +65,9 @@ def get_model_checkpoint_path(model_name: str, testing_epoch: int = None) -> str
         return checkpoint_path
 
 class RadarPoseTester:
-    def __init__(self, root_path: str, seq_len: int = SEQLEN, device: str = TRAINCONFIG["device"], single_frame: bool = False):
+    """Evaluation pipeline for radar-based pose estimation models."""
+
+    def __init__(self, root_path: str, seq_len: int = SEQLEN, device: str = TRAINCONFIG["device"], single_frame: bool = False) -> None:
         self.root_path = root_path
         self.seq_len = seq_len
         self.device = device
@@ -71,6 +75,7 @@ class RadarPoseTester:
 
     @staticmethod
     def compute_mpjpe(preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False):
+        """Compute Mean Per Joint Position Error (MPJPE) between predictions and targets."""
         preds = preds.view(preds.size(0), 26, 3)
         targets = targets.view(targets.size(0), 26, 3)
 
@@ -82,6 +87,7 @@ class RadarPoseTester:
         return dist.mean(), dist.std()
     
     def compute_p_mpjpe(self, preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False):
+        """Compute Procrustes-aligned MPJPE (P-MPJPE) after rigid alignment."""
         preds = preds.view(preds.size(0), 26, 3)
         targets = targets.view(targets.size(0), 26, 3)
 
@@ -96,11 +102,12 @@ class RadarPoseTester:
             return dist.mean(dim=0), dist.std(dim=0)
         return dist.mean(), dist.std()
     
-    def procrustes_torch(self, 
-                         X: torch.Tensor, 
-                         Y: torch.Tensor, 
-                         scaling: bool = True, 
+    def procrustes_torch(self,
+                         X: torch.Tensor,
+                         Y: torch.Tensor,
+                         scaling: bool = True,
                          reflection: str = 'best'):
+        """Align Y to X using Procrustes analysis (rotation, scaling, translation)."""
         muX = X.mean(dim=0, keepdim=True)
         muY = Y.mean(dim=0, keepdim=True)
 
@@ -140,6 +147,7 @@ class RadarPoseTester:
         return Z
 
     def load_sequence(self, combination: list[str]):
+        """Load radar and skeleton data for a given participant/angle/action/rep combination."""
         radar_path = os.path.join(self.root_path, "radar", f"data_cube_parsed_{'_'.join(combination)}.npz")
         skeleton_path = os.path.join(self.root_path, "skeletons", f"skeleton_{'_'.join(combination)}.npy")
 
@@ -155,6 +163,7 @@ class RadarPoseTester:
         return radar_tensor, skeleton_tensor
 
     def predict_sequence(self, combination: list[str], keypoints: bool = False, return_preds: bool = False):
+        """Run model inference on a single sequence and compute P-MPJPE."""
         radar, target = self.load_sequence(combination)
         if radar is None or target is None:
             return (None,) * 6
@@ -223,6 +232,7 @@ class RadarPoseTester:
         return error, std, preds, vars, gts, ensembles
 
     def evaluate(self, test_set: list[list[str]], keypoints: bool = False):
+        """Evaluate model across multiple sequences and aggregate predictions."""
         losses, stds, preds, vars, gts, ensembles = [], [], [], [], [], []
 
         for comb in test_set:
@@ -255,6 +265,7 @@ class RadarPoseTester:
         keypoints: bool = False,
         batch_size: int = 32
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Evaluate single-frame model (no temporal sequences) across test set."""
         losses, stds = [], []
         all_preds, all_vars, all_gts = [], [], []
 
@@ -304,7 +315,8 @@ class RadarPoseTester:
 
         return error, std, preds, vars, gts
 
-    def run_evaluation(self, parts, angles, actions, reps, model_path: str):
+    def run_evaluation(self, parts: list, angles: list, actions: list, reps: list, model_path: str):
+        """Run full evaluation: load model, evaluate all combinations, save predictions and calibration data."""
         sys.path.append(MODELPATH)
         
         if MODELNAME in ("RPPgaussianGaussian", "RPPlaplaceLaplace", "RPPlaplaceGaussian", "RPPgaussianLaplace"):

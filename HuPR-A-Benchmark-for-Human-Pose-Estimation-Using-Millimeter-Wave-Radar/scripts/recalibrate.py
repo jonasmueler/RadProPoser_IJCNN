@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
@@ -53,7 +54,7 @@ def save_predictions(
     print(f"Saved predictions to {save_path}")
 
 
-def load_predictions(gt_source: str, phase: str) -> tuple[np.ndarray, np.ndarray, np.ndarray] | None:
+def load_predictions(gt_source: str, phase: str) -> Optional[Tuple[np.ndarray, np.ndarray, np.ndarray]]:
     """Load predictions from disk if they exist.
 
     Args:
@@ -98,7 +99,7 @@ def get_checkpoint_path() -> Path:
 
 def run_inference(
     model: RadProPoserVAECov, dataloader: torch.utils.data.DataLoader
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run model inference to collect predictions, variances, and ground truth.
 
     Args:
@@ -130,8 +131,8 @@ def run_inference(
 
 
 def get_or_run_inference(
-    gt_source: str, phase: str, model: RadProPoserVAECov | None = None
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    gt_source: str, phase: str, model: Optional[RadProPoserVAECov] = None
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Load predictions from cache or run inference if not cached.
 
     Args:
@@ -165,7 +166,7 @@ def get_or_run_inference(
     return mu, var, gt
 
 
-def format_sharpness_table(results: dict, gt_source: str) -> None:
+def format_sharpness_table(results: Dict[str, Any], gt_source: str) -> None:
     """Print formatted sharpness values for table creation.
 
     Args:

@@ -1,9 +1,11 @@
-import numpy as np
 import os
 import sys
-from config import MODELNAME
+
+import numpy as np
+
 from calibration_analysis import MultiModelRecalibrationVisualizer as ParametricVisualizer
 from calibration_analysis_empirical import MultiModelRecalibrationVisualizer as EmpiricalVisualizer
+from config import MODELNAME
 
 MODELS = {
     "rppgaussiangaussian": {"type": "parametric", "laplace": False},
@@ -16,6 +18,14 @@ MODELS = {
 }
 
 def load_data(model_suffix: str):
+    """Load saved predictions, variances, ground truth, and optional ensemble data for a model.
+
+    Args:
+        model_suffix: Lowercase model name suffix for file lookup (e.g., "rppgaussiangaussiancov").
+
+    Returns:
+        Tuple of (mu_val, var_val, gt_val, ensemble_val, mu_test, var_test, gt_test, ensemble_test).
+    """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     calib_dir = os.path.join(base_dir, "calibration_analysis")
     
@@ -41,6 +51,7 @@ def load_data(model_suffix: str):
     return mu_val, var_val, gt_val, ensemble_val, mu_test, var_test, gt_test, ensemble_test
 
 def main():
+    """Run recalibration analysis for the model specified in config."""
     if MODELNAME is None:
         print("ERROR: MODELNAME not set in config.py")
         return

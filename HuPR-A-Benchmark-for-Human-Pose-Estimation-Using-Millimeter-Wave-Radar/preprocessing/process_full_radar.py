@@ -1,9 +1,14 @@
+import shutil
+import sys
+from multiprocessing import Pool, cpu_count
+from pathlib import Path
+from typing import List, Tuple
+
 import numpy as np
 import torch
-import shutil
-from pathlib import Path
-from typing import List
-from multiprocessing import Pool, cpu_count
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import DATA_DIR
 
 # Radar hardware constants
 NUM_RX = 4
@@ -14,9 +19,6 @@ NUM_CHIRPS_TOTAL = 192  # 64 chirps × 3 TX
 NUM_CHIRPS_PER_TX = 64
 NUM_LANES = 2
 NUM_FRAMES = 600  # 10 FPS × 60 seconds
-
-# Data paths
-DATA_DIR = Path("/home/XXXX-1/data/HuPR")
 
 # Parallel processing config
 NUM_WORKERS = 10  # 24 cores, 125GB RAM - use 10 workers (~12GB each)
@@ -151,7 +153,7 @@ def process_frame(
     return output.numpy()
 
 
-def process_sequence_worker(args) -> tuple:
+def process_sequence_worker(args) -> Tuple[int, bool]:
     """Worker function for parallel processing.
 
     Args:

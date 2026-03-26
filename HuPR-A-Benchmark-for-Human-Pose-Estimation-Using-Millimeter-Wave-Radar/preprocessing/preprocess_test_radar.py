@@ -1,13 +1,16 @@
-"""Preprocess raw ADC radar data to VRDAEmaps for HuPR model using GPU-accelerated FFT."""
-
+import shutil
+import sys
 from pathlib import Path
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
-RAW_DIR = Path("/home/XXXX-1/data/HuPR/test_raw")
-OUTPUT_DIR = Path("/home/XXXX-1/data/HuPR/test_processed")
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import DATA_DIR
+
+RAW_DIR = DATA_DIR / "test_raw"
+OUTPUT_DIR = DATA_DIR / "test_processed"
 
 # Radar hardware parameters
 NUM_RX = 4
@@ -238,7 +241,6 @@ def process_sequence_radar(seq_id: int, radar: str) -> bool:
 
     # Force reprocess by removing existing files
     if out_dir.exists():
-        import shutil
         shutil.rmtree(out_dir)
 
     out_dir.mkdir(parents=True, exist_ok=True)

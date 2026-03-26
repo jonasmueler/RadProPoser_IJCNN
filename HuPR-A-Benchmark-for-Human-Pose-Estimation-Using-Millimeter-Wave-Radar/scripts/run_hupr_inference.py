@@ -11,11 +11,11 @@ from tqdm import tqdm
 SCRIPT_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from config import HUPR_CHECKPOINT_PATH, HUPR_INFERENCE_CONFIG
+from config import DATA_DIR, HUPR_CHECKPOINT_PATH, HUPR_INFERENCE_CONFIG
 from misc.constants import TEST_SEQUENCES
 from models import HuPRNet
 
-PROCESSED_DIR = Path("/home/XXXX-1/data/HuPR/test_processed")
+PROCESSED_DIR = DATA_DIR / "test_processed"
 
 # Config values from central config
 NUM_GROUP_FRAMES = HUPR_INFERENCE_CONFIG["num_group_frames"]

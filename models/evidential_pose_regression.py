@@ -1,26 +1,29 @@
+from typing import Any, Dict, List, Optional, Tuple, Type
+
+from edl_pytorch import NormalInvGamma
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from yacs.config import CfgNode as CN
+
 from common import *
 from hrnet3D_config import *
 from hrnet3D_config_4D import MODEL_CONFIGS as cfg_4D
-from yacs.config import CfgNode as CN
-import torch
-from edl_pytorch import NormalInvGamma
 from transformer import Transformer
 
 class HighResolutionModule(nn.Module):
     def __init__(
         self,
-        num_branches,
-        blocks,
-        num_blocks,
-        num_inchannels,
-        num_channels,
-        fuse_method,
-        multi_scale_output=True,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        num_branches: int,
+        blocks: Type[nn.Module],
+        num_blocks: List[int],
+        num_inchannels: List[int],
+        num_channels: List[int],
+        fuse_method: str,
+        multi_scale_output: bool = True,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> None:
         super(HighResolutionModule, self).__init__()
         self._check_branches(
             num_branches, blocks, num_blocks, num_inchannels, num_channels
@@ -46,8 +49,8 @@ class HighResolutionModule(nn.Module):
         self.relu = nn.ReLU(inplace=False)
 
     def _check_branches(
-        self, num_branches, blocks, num_blocks, num_inchannels, num_channels
-    ):
+        self, num_branches: int, blocks: Type[nn.Module], num_blocks: List[int], num_inchannels: List[int], num_channels: List[int]
+    ) -> None:
         if num_branches != len(num_blocks):
             error_msg = "NUM_BRANCHES({}) <> NUM_BLOCKS({})".format(
                 num_branches, len(num_blocks)
@@ -71,14 +74,14 @@ class HighResolutionModule(nn.Module):
 
     def _make_one_branch(
         self,
-        branch_index,
-        block,
-        num_blocks,
-        num_channels,
-        stride=1,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        branch_index: int,
+        block: Type[nn.Module],
+        num_blocks: List[int],
+        num_channels: List[int],
+        stride: int = 1,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> nn.Sequential:
         downsample = None
         if (
             stride != 1
@@ -121,8 +124,8 @@ class HighResolutionModule(nn.Module):
         return nn.Sequential(*layers)
 
     def _make_branches(
-        self, num_branches, block, num_blocks, num_channels, bn_type, bn_momentum=0.1
-    ):
+        self, num_branches: int, block: Type[nn.Module], num_blocks: List[int], num_channels: List[int], bn_type: Optional[str] = None, bn_momentum: float = 0.1
+    ) -> nn.ModuleList:
         branches = []
         for i in range(num_branches):
             branches.append(
@@ -138,7 +141,7 @@ class HighResolutionModule(nn.Module):
 
         return nn.ModuleList(branches)
 
-    def _make_fuse_layers(self, bn_type, bn_momentum=0.1):
+    def _make_fuse_layers(self, bn_type: Optional[str], bn_momentum: float = 0.1) -> Optional[nn.ModuleList]:
         if self.num_branches == 1:
             return None
         num_branches = self.num_branches
@@ -205,10 +208,10 @@ class HighResolutionModule(nn.Module):
 
         return nn.ModuleList(fuse_layers)
 
-    def get_num_inchannels(self):
+    def get_num_inchannels(self) -> List[int]:
         return self.num_inchannels
 
-    def forward(self, x):
+    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         if self.num_branches == 1:
             return [self.branches[0](x[0])]
 
@@ -238,7 +241,7 @@ class HighResolutionModule(nn.Module):
 
 
 class HighResolution3DNet(nn.Module):
-    def __init__(self, cfg, bn_type=None, bn_momentum=None, **kwargs):
+    def __init__(self, cfg: Dict[str, Any], bn_type: Optional[str] = None, bn_momentum: Optional[float] = None, **kwargs: Any) -> None:
         super(HighResolution3DNet, self).__init__()
         if kwargs['full_res_stem']:
             self.full_res_stem = kwargs['full_res_stem']
@@ -290,8 +293,8 @@ class HighResolution3DNet(nn.Module):
             )
 
     def _make_transition_layer(
-        self, num_channels_pre_layer, num_channels_cur_layer, bn_type, bn_momentum
-    ):
+        self, num_channels_pre_layer: List[int], num_channels_cur_layer: List[int], bn_type: Optional[str] = None, bn_momentum: Optional[float] = None
+    ) -> nn.ModuleList:
         num_branches_cur = len(num_channels_cur_layer)
         num_branches_pre = len(num_channels_pre_layer)
         transition_layers = []
@@ -338,12 +341,12 @@ class HighResolution3DNet(nn.Module):
 
     def _make_stage(
         self,
-        layer_config,
-        num_inchannels,
-        multi_scale_output=True,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        layer_config: Dict[str, Any],
+        num_inchannels: List[int],
+        multi_scale_output: bool = True,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> Tuple[nn.Sequential, List[int]]:
         num_modules = layer_config["NUM_MODULES"]
         num_branches = layer_config["NUM_BRANCHES"]
         num_blocks = layer_config["NUM_BLOCKS"]
@@ -376,7 +379,7 @@ class HighResolution3DNet(nn.Module):
 
         return nn.Sequential(*modules), num_inchannels
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         x = self.layer1(x)
         x_list = []
         for i in range(self.stage2_cfg["NUM_BRANCHES"]):
@@ -405,7 +408,7 @@ class HighResolution3DNet(nn.Module):
         return y_list
 
 class ResidualMLP(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
         self.block = nn.Sequential(
             nn.Linear(dim, dim // 2),
@@ -413,12 +416,14 @@ class ResidualMLP(nn.Module):
             nn.Linear(dim // 2, dim)
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x + self.block(x)
 
 
 class RadProPoserEvidential(nn.Module):
-    def __init__(self):
+    """Radar pose estimator using evidential deep learning for uncertainty quantification."""
+
+    def __init__(self) -> None:
         super(RadProPoserEvidential, self).__init__()
 
         # backbone 
@@ -448,15 +453,15 @@ class RadProPoserEvidential(nn.Module):
         
         
     
-    def preProcess(self, 
-                   x: torch.Tensor):
+    def preProcess(self,
+                   x: torch.Tensor) -> torch.Tensor:
         x = x - torch.mean(x, dim = -1, keepdim = True)
         x = torch.fft.fft(torch.fft.fft(torch.fft.fft(torch.fft.fft(x ,dim = -1,  norm = "forward"), dim = -2,  norm = "forward"), dim = -3,  norm = "forward"), dim = -4,  norm = "forward")
 
-        x = x.permute(0, 1, 5, 2, 3, 4) 
+        x = x.permute(0, 1, 5, 2, 3, 4)
         return x
 
-    def applyBackbone(self, x: torch.Tensor):
+    def applyBackbone(self, x: torch.Tensor) -> torch.Tensor:
         # get features
         featureList = self.backbone(x)
 
@@ -473,7 +478,7 @@ class RadProPoserEvidential(nn.Module):
         return features
     
     def sample_aleatoric_from_output(self,
-        model_output,
+        model_output: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
         n_samples: int = 500,
         eps: float = 1e-6
             ) -> torch.Tensor:
@@ -506,9 +511,9 @@ class RadProPoserEvidential(nn.Module):
         eps_noise = torch.randn_like(std_exp)
         return mu_exp + eps_noise * std_exp
         
-    def forward(self, 
-                x: torch.Tensor):
-        # fft layer 
+    def forward(self,
+                x: torch.Tensor) -> Tuple[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
+        # fft layer
         x = self.preProcess(x) # watch out with batch = 1
         #device = x.device
 
@@ -533,8 +538,8 @@ class RadProPoserEvidential(nn.Module):
 
         return out_uncertainty, samples.permute(0, 2, 1)
     
-    def forward_inference(self, 
-                      x: torch.Tensor):
+    def forward_inference(self,
+                      x: torch.Tensor) -> Tuple[Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor], torch.Tensor]:
         """
         Optimized forward for inference with batch_size=1.
         - Batches all backbone calls into single forward pass

@@ -1,26 +1,27 @@
-import torch
-import wandb
 import os
-import torch.nn as nn
+
 import numpy as np
-from config import *
-import torch.optim as optim
+import torch
+import torch.nn as nn
 import torch.nn.functional as F
+import torch.optim as optim
+import wandb
 from edl_pytorch import evidential_regression
-from torch.optim.lr_scheduler import SequentialLR, LambdaLR
+from torch.optim.lr_scheduler import LambdaLR, SequentialLR
+
+from config import *
 
 
 def MPJPE(preds: torch.Tensor, 
           targets: torch.Tensor)->torch.Tensor:
-    """
-    Calculate the Mean Per Joint Position Error (MPJPE).
-    
+    """Calculate the Mean Per Joint Position Error (MPJPE).
+
     Args:
-    preds (torch.Tensor): Predicted joint positions, shape (batch_size, num_joints, 3).
-    targets (torch.Tensor): Ground truth joint positions, shape (batch_size, num_joints, 3).
-    
+        preds: Predicted joint positions, shape (batch_size, num_joints, 3).
+        targets: Ground truth joint positions, shape (batch_size, num_joints, 3).
+
     Returns:
-    float: The MPJPE for the batch.
+        The MPJPE for the batch.
     """
     assert preds.shape == targets.shape, "Predictions and targets must have the same shape"
     
@@ -37,14 +38,12 @@ def MPJPE(preds: torch.Tensor,
 def saveCheckpoint(model: nn.Module, 
                    optimizer: torch.optim.Adam, 
                    filename: str):
-    """
-    Saves the model and optimizer states to a checkpoint file.
+    """Saves the model and optimizer states to a checkpoint file.
 
     Args:
-        model (nn.Module): The model whose state needs to be saved.
-        optimizer (torch.optim.Optimizer): The optimizer whose state needs to be saved.
-        filename (str): The name of the file to save the checkpoint to (relative to PATHORIGIN).
-
+        model: The model whose state needs to be saved.
+        optimizer: The optimizer whose state needs to be saved.
+        filename: The name of the file to save the checkpoint to (relative to PATHORIGIN).
     """
     filepath = os.path.join(PATHORIGIN, filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -59,53 +58,51 @@ def saveCheckpoint(model: nn.Module,
 def loadCheckpoint(model: nn.Module, 
                    optimizer: torch.optim.Adam, 
                    path: str)->torch.nn.Module:
-    """
-    Loads a trained model and/or optimizer state from a checkpoint file.
+    """Loads a trained model and/or optimizer state from a checkpoint file.
 
     Args:
-        model (nn.Module): The model instance to load the saved state into.
-        optimizer (torch.optim.Optimizer): The optimizer instance to load the saved state into. 
-                                           If None, only the model state will be loaded.
-        path (str): Path to the checkpoint file.
+        model: The model instance to load the saved state into.
+        optimizer: The optimizer instance. If None, only the model state will be loaded.
+        path: Path to the checkpoint file.
 
     Returns:
-        torch.nn.Module: The model with the loaded state.
-        If an optimizer is provided, returns a list [model, optimizer] with both loaded states.
+        The model with the loaded state, or [model, optimizer] if optimizer is provided.
     """
 
-    if optimizer != None:
+    if optimizer is not None:
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         print("checkpoint loaded")
         return [model, optimizer]
-    elif optimizer == None:
+    elif optimizer is None:
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint['model'])
         print("checkpoint loaded")
         return model
     
 def lrLambda(epoch: int):
+    """Return multiplicative learning rate decay factor for the scheduler."""
     return TRAINCONFIG["lrDecay"]
 
-def KLLoss(mu: torch.Tensor, 
+def KLLoss(mu: torch.Tensor,
            logvar: torch.Tensor)->torch.Tensor:
+    """Compute KL divergence between learned Gaussian posterior and standard normal prior."""
     klloss = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
     return klloss
 
 def nllLoss(gt: torch.Tensor, 
             mu: torch.Tensor, 
             var: torch.Tensor) -> torch.Tensor:
-    """
-    Simplified Negative Log-Likelihood (NLL) Loss Function.
+    """Simplified Negative Log-Likelihood (NLL) loss function.
 
     Args:
-        gt (torch.Tensor): Ground truth tensor.
-        mu (torch.Tensor): Predicted mean tensor.
-        var (torch.Tensor): Predicted variance tensor.
+        gt: Ground truth tensor.
+        mu: Predicted mean tensor.
+        var: Predicted variance tensor.
 
     Returns:
-        torch.Tensor: Computed NLL loss.
+        Tuple of (NLL loss, variance penalty).
     """
     # Ensure variance is positive to avoid numerical instability
     var = torch.clamp(var, min=1e-6)
@@ -119,10 +116,15 @@ def nllLoss(gt: torch.Tensor,
 def nll_from_cov(gt: torch.Tensor,
                  mu: torch.Tensor,
                  cov: torch.Tensor):
-    """
-    gt  : (B, K)         ground truth
-    mu  : (B, K)         predictive mean
-    cov : (B, K, K)      predictive covariance (SPD)
+    """Negative log-likelihood loss for full covariance predictions.
+
+    Args:
+        gt: Ground truth of shape (B, K).
+        mu: Predictive mean of shape (B, K).
+        cov: Predictive covariance (SPD) of shape (B, K, K).
+
+    Returns:
+        Tuple of (NLL loss, covariance penalty).
     """
     B, K = gt.shape
     eps  = 1e-6
@@ -147,17 +149,15 @@ def nll_from_cov(gt: torch.Tensor,
 def nllLoss_precision(gt: torch.Tensor, 
                         mu: torch.Tensor, 
                         log_variance: torch.Tensor) -> torch.Tensor:
-    """
-    NLL loss using predicted log variance, internally converting
-    to log precision and using the precision-based Gaussian NLL.
+    """NLL loss using predicted log variance, converting to precision-based Gaussian NLL.
 
     Args:
-        gt (torch.Tensor): Ground truth tensor.
-        mu (torch.Tensor): Predicted mean tensor.
-        log_variance (torch.Tensor): Predicted log variance (log(sigma^2)).
+        gt: Ground truth tensor.
+        mu: Predicted mean tensor.
+        log_variance: Predicted log variance (log(sigma^2)).
 
     Returns:
-        torch.Tensor: Scalar NLL loss.
+        Tuple of (NLL loss, precision penalty).
     """
     # Step 1: Convert to variance
     #variance = torch.exp(log_variance)
@@ -182,19 +182,15 @@ def laplace_nll(
     mu_pred: torch.Tensor,
     var_pred: torch.Tensor
 ) -> torch.Tensor:
-    """
-    Laplace negative log-likelihood loss computed from empirical variance.
-
-    Assumes var_pred was estimated from multiple forward samples.
+    """Laplace negative log-likelihood loss computed from empirical variance.
 
     Args:
-        y_true (torch.Tensor): Ground truth tensor.
-        mu_pred (torch.Tensor): Empirical mean of predicted samples.
-        var_pred (torch.Tensor): Empirical variance of predicted samples.
+        y_true: Ground truth tensor.
+        mu_pred: Empirical mean of predicted samples.
+        var_pred: Empirical variance of predicted samples.
 
     Returns:
-        loss: Scalar loss averaged over batch and dimensions.
-        penalty: Scalar penalty term averaged separately (log_b term).
+        Tuple of (loss, penalty) averaged over batch and dimensions.
     """
     # Convert variance to Laplace scale: var = 2b² ⇒ b = sqrt(var / 2)
     b = torch.sqrt(torch.clamp(var_pred, min=1e-10) / 2.0)
@@ -217,38 +213,18 @@ def trainLoop(trainLoader: torch.utils.data.DataLoader,
               device: str, 
               criterion: nn.Module):
         
-    """
-    Wrapper function to train a PyTorch nn.Module model with support for checkpoint loading, 
-    optimizer and scheduler setup, and logging using Weights & Biases.
+    """Train a model with checkpoint loading, optimizer/scheduler setup, and WandB logging.
 
     Args:
-        trainLoader (torch.utils.data.DataLoader): DataLoader for the training dataset.
-        valLoader (torch.utils.data.DataLoader): DataLoader for the validation dataset.
-        model (nn.Module): The neural network model to be trained.
-        loadModel (bool): Flag indicating whether to load a previously saved model checkpoint.
-        modelName (str): The name of the model used for saving checkpoints and logging.
-        params (dict): Dictionary containing training parameters, including:
-                    - "optimizer": Type of optimizer ("adam" or "RMSProp").
-                    - "learningRate": Learning rate for the optimizer.
-                    - "betas": Betas for the Adam optimizer.
-                    - "weightDecay": Weight decay (L2 regularization) factor.
-                    - "epochs": Number of training epochs.
-        WandB (bool): Flag indicating whether to use Weights & Biases for logging.
-        device (str): Device to use for training (e.g., "cpu" or "cuda").
-        criterion (nn.Module): Loss function to use when TRAINCONFIG["nll"] is False.
-
-    Functionality:
-        - Initializes Weights & Biases (WandB) for experiment tracking if enabled.
-        - Sets up the optimizer and learning rate scheduler.
-        - Loads a model and optimizer from a checkpoint if loadModel is True.
-        - Performs training over the specified number of epochs:
-            - Computes the forward pass and loss, using a custom NLL loss if TRAINCONFIG["nll"] is True,
-            or a provided criterion otherwise.
-            - Applies gradient clipping and updates the model parameters.
-            - Logs the training loss to WandB if enabled.
-        - Performs validation at the end of each epoch, logging the validation loss to WandB.
-        - Saves model and optimizer checkpoints after each epoch.
-        - Saves the final model and optimizer state after training is complete.
+        trainLoader: DataLoader for the training dataset.
+        valLoader: DataLoader for the validation dataset.
+        model: The neural network model to be trained.
+        loadModel: Whether to load a previously saved model checkpoint.
+        modelName: The name of the model used for saving checkpoints and logging.
+        params: Training parameters (optimizer, learningRate, betas, weightDecay, epochs).
+        WandB: Whether to use Weights & Biases for logging.
+        device: Device to use for training (e.g., "cpu" or "cuda").
+        criterion: Loss function to use when TRAINCONFIG["nll"] is False.
     """
 
     # WandB

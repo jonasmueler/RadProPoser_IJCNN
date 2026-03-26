@@ -1,19 +1,21 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
 
+
 class LearnablePositionalEncoding(nn.Module):
-    def __init__(self, max_seq_len, d_model):
+    def __init__(self, max_seq_len: int, d_model: int) -> None:
         super().__init__()
         self.max_seq_len = max_seq_len
-        self.pos_embedding = nn.Parameter(torch.ones(1, max_seq_len, d_model))  # Max sequence length
+        self.pos_embedding = nn.Parameter(torch.ones(1, max_seq_len, d_model))
 
-    def forward(self, x):
-        
-        return x + self.pos_embedding  # Dynamically slice position embedding
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x + self.pos_embedding
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, d_model, num_heads, d_ff, dropout=0.1):
+    def __init__(self, d_model: int, num_heads: int, d_ff: int, dropout: float = 0.1) -> None:
         super().__init__()
         self.attn = nn.MultiheadAttention(embed_dim=d_model, num_heads=num_heads, batch_first=True)
         self.ffn = nn.Sequential(
@@ -23,30 +25,33 @@ class TransformerBlock(nn.Module):
         )
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, mask=None):
-        # Self-attention
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         attn_output, _ = self.attn(x, x, x, attn_mask=mask)
         x = x + self.dropout(attn_output)
 
-        # Feedforward network
         ffn_output = self.ffn(x)
         x = x + self.dropout(ffn_output)
-        
+
         return x
 
+
 class Transformer(nn.Module):
-    def __init__(self, input_dim=128, seq_len=16, d_model=256, num_heads=8, d_ff=512, num_layers=1, dropout=0.1):
+    """Spatial-temporal transformer for aggregating radar pose features across sequence elements."""
+
+    def __init__(self, input_dim: int = 128, seq_len: int = 16, d_model: int = 256,
+                 num_heads: int = 8, d_ff: int = 512, num_layers: int = 1,
+                 dropout: float = 0.1) -> None:
         super().__init__()
-        self.embedding = nn.Linear(input_dim, d_model)  # Input projection to d_model
+        self.embedding = nn.Linear(input_dim, d_model)
         self.positional_encoding = LearnablePositionalEncoding(seq_len, d_model)
 
         self.transformer_layers = nn.ModuleList([
             TransformerBlock(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)
         ])
 
-        self.output_layer = nn.Linear(d_model, input_dim)  # Output projection back to input_dim
+        self.output_layer = nn.Linear(d_model, input_dim)
 
-    def forward(self, x, mask=None):
+    def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         x = self.embedding(x)
         x = self.positional_encoding(x)
 
@@ -57,7 +62,6 @@ class Transformer(nn.Module):
 
 
 if __name__ == "__main__":
-    # Example usage
     seq_len = 8
     input_dim = 128
     batch_size = 64

@@ -2,7 +2,10 @@ from pathlib import Path
 
 # Base paths
 PATHORIGIN = Path(__file__).parent
-DATA_DIR = Path("/home/XXXX-1/data/HuPR")
+DATA_DIR = None  # Set this to your HuPR data directory, e.g. Path("/path/to/HuPR")
+
+if DATA_DIR is None:
+    raise ValueError("DATA_DIR must be set in config.py to your HuPR data directory.")
 ANNOT_DIR = DATA_DIR / "annotations"
 RADAR_FULL_DIR = DATA_DIR / "radar_full"
 

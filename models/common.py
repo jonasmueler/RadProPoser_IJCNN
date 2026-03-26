@@ -1,7 +1,8 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def create_conv(in_channels, out_channels, kernel_size, stride, order, num_groups, padding, is3d):
+def create_conv(in_channels: int, out_channels: int, kernel_size: int, stride: int, order: str, num_groups: int, padding: int, is3d: bool) -> list[tuple[str, nn.Module]]:
     """
     Create a list of modules with together constitute a single conv layer with non-linearity
     and optional batchnorm/groupnorm.
@@ -89,7 +90,7 @@ class SingleConv(nn.Sequential):
         is3d (bool): if True use Conv3d, otherwise use Conv2d
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size=3,  stride=1, order='gcr', num_groups=8, padding=1, is3d=True):
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int = 3, stride: int = 1, order: str = 'gcr', num_groups: int = 8, padding: int = 1, is3d: bool = True) -> None:
         super(SingleConv, self).__init__()
 
         for name, module in create_conv(in_channels, out_channels, kernel_size, stride, order, num_groups, padding, is3d):
@@ -104,7 +105,7 @@ class ResNetBlock(nn.Module):
     """
 
     expansion = 1
-    def __init__(self, in_channels, out_channels, stride=1, downsample=None, bn_type=None, bn_momentum=None, order='gcr', num_groups=8, is3d=True, **kwargs):
+    def __init__(self, in_channels: int, out_channels: int, stride: int = 1, downsample: nn.Module | None = None, bn_type: str | None = None, bn_momentum: float | None = None, order: str = 'gcr', num_groups: int = 8, is3d: bool = True, **kwargs) -> None:
         super(ResNetBlock, self).__init__()
         kernel_size = 3
         self.downsample = downsample
@@ -135,7 +136,7 @@ class ResNetBlock(nn.Module):
         else:
             self.non_linearity = nn.ReLU(inplace=False)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # apply first convolution to bring the number of channels to out_channels
         residual = self.conv1(x)
         # residual block
@@ -146,14 +147,14 @@ class ResNetBlock(nn.Module):
         out += residual
         out = self.non_linearity(out)
         return out
-    
+
 
 class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(
-        self, inplanes, planes, stride=1, downsample=None, bn_type=None, bn_momentum=0.1
-    ):
+        self, inplanes: int, planes: int, stride: int = 1, downsample: nn.Module | None = None, bn_type: str | None = None, bn_momentum: float = 0.1
+    ) -> None:
         super(BasicBlock, self).__init__()
         self.conv1 = nn.Conv3d(
         inplanes, planes, kernel_size=3, stride=stride, padding=1, bias=False
@@ -172,7 +173,7 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x
 
         out = self.conv1(x)
@@ -195,8 +196,8 @@ class Bottleneck(nn.Module):
     expansion = 4
 
     def __init__(
-        self, inplanes, planes, stride=1, downsample=None, bn_type=None, bn_momentum=0.1
-    ):
+        self, inplanes: int, planes: int, stride: int = 1, downsample: nn.Module | None = None, bn_type: str | None = None, bn_momentum: float = 0.1
+    ) -> None:
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv3d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm3d(
@@ -217,7 +218,7 @@ class Bottleneck(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x
 
         out = self.conv1(x)

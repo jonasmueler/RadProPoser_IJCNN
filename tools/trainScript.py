@@ -1,14 +1,16 @@
 import os
+import random
+import sys
+import warnings
+
+import numpy as np
+import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
+
 import dataLoaders
 import trainLoop
-import torch
 from config import *
-import sys
-import random 
-import numpy as np 
-import torch.nn as nn
-import warnings
 
 # load model
 sys.path.append(MODELPATH)
@@ -30,39 +32,36 @@ CF = Encoder().to(TRAINCONFIG["device"])
 def loadCheckpoint(model: nn.Module, 
                    optimizer: torch.optim.Adam, 
                    path: str)->torch.nn.Module:
-    """
-    Loads a trained model and/or optimizer state from a checkpoint file.
+    """Loads a trained model and/or optimizer state from a checkpoint file.
 
     Args:
-        model (nn.Module): The model instance to load the saved state into.
-        optimizer (torch.optim.Optimizer): The optimizer instance to load the saved state into. 
-                                           If None, only the model state will be loaded.
-        path (str): Path to the checkpoint file.
+        model: The model instance to load the saved state into.
+        optimizer: The optimizer instance to load the saved state into.
+                   If None, only the model state will be loaded.
+        path: Path to the checkpoint file.
 
     Returns:
-        torch.nn.Module: The model with the loaded state.
-        If an optimizer is provided, returns a list [model, optimizer] with both loaded states.
+        The model with the loaded state, or [model, optimizer] if optimizer is provided.
     """
 
-    if optimizer != None:
+    if optimizer is not None:
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
         print("checkpoint loaded")
         return [model, optimizer]
-    elif optimizer == None:
+    elif optimizer is None:
         checkpoint = torch.load(path)
         model.load_state_dict(checkpoint['model'])
         print("checkpoint loaded")
         return model
 
 ## set seed 
-def setSeed(seed: int):
-    """
-    Set the seed for reproducibility in PyTorch across CPU, GPU, NumPy, and Python random.
-    
-    Parameters:
-    seed (int): The seed value to use.
+def setSeed(seed: int) -> None:
+    """Set the seed for reproducibility in PyTorch across CPU, GPU, NumPy, and Python random.
+
+    Args:
+        seed: The seed value to use.
     """
     # Set seed for CPU and GPU (if available)
     torch.manual_seed(seed)

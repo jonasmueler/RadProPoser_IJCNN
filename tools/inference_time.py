@@ -1,9 +1,11 @@
 import os
 import sys
 import time
+
 import torch
 import torch.nn as nn
 from torch.utils.flop_counter import FlopCounterMode
+
 from config import MODELPATH, SEQLEN
 
 # add model path
@@ -26,10 +28,12 @@ DEVICE = "cuda"
 
 
 def count_parameters(model: nn.Module) -> int:
+    """Count total number of parameters in a model."""
     return sum(p.numel() for p in model.parameters())
 
 
 def count_trainable_parameters(model: nn.Module) -> int:
+    """Count number of trainable (requires_grad) parameters in a model."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 

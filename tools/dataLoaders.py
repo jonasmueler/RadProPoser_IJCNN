@@ -1,17 +1,18 @@
-import torch
 import os
-from torch.utils.data import Dataset
-from torch import is_tensor
-from torch.utils.data import DataLoader
-import numpy as np 
 import random
+
+import numpy as np
+import torch
 import torchvision.transforms.functional as TF
+from torch import is_tensor
+from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
 
 # Define your processing function
 def preProcess(
-                   x: torch.Tensor):
+                   x: torch.Tensor) -> torch.Tensor:
+        """Apply 4D FFT preprocessing to complex radar tensor and permute axes."""
         x = x.unsqueeze(dim = 0)
         x = x - torch.mean(x, dim = -1, keepdim = True)
         #x = torch.fft.fftn(x, dim=(0, 1, 2, 3), norm="forward")
@@ -24,7 +25,8 @@ def preProcess(
         x = x.permute(0, 1, 5, 2, 3, 4) 
         return x.squeeze()
 
-def preProcess_numpy(x: np.ndarray):
+def preProcess_numpy(x: np.ndarray) -> np.ndarray:
+    """NumPy equivalent of preProcess for offline radar preprocessing."""
     # Add new axis (equivalent to `unsqueeze(dim=0)`)
     x = np.expand_dims(x, axis=0)
 
@@ -44,22 +46,22 @@ def preProcess_numpy(x: np.ndarray):
 
 
 class RadarData(Dataset):
-    def __init__(self, 
-                 trainMode: str, 
+    """Dataset for loading preprocessed radar sequences and skeleton targets for training and evaluation."""
+
+    def __init__(self,
+                 trainMode: str,
                  rootPath: str,
-                 trainDataPath: str, 
+                 trainDataPath: str,
                  seqLen: int,
-                 single_frame: bool = False):
-        """
-        Initializes the RadarData dataset class for loading horizontal and vertical radar data.
+                 single_frame: bool = False) -> None:
+        """Initializes the RadarData dataset class for loading horizontal and vertical radar data.
 
         Args:
-            trainMode (str): Indicates whether the mode is 'train' or 'val'.
-            rootPath (str): Root path where the radar and skeleton data are stored.
-            trainDataPath (str): Path to the specific training data files.
-            seqLen (int): Length of the sequence to be loaded for training or validation.
-            single_frame (bool): If True, load single frames instead of sequences (for HRRadarPose).
-
+            trainMode: Indicates whether the mode is 'train' or 'val'.
+            rootPath: Root path where the radar and skeleton data are stored.
+            trainDataPath: Path to the specific training data files.
+            seqLen: Length of the sequence to be loaded for training or validation.
+            single_frame: If True, load single frames instead of sequences (for HRRadarPose).
         """
         # genral 
         self.seqLen = seqLen
@@ -199,18 +201,17 @@ class RadarData(Dataset):
             self.gt = self.load_directory_into_ram(os.path.join(self.trainPath, "val", self.dataMode, "target"))
 
                            
-    def __len__(self):
+    def __len__(self) -> int:
         return self.counter
     
-    def load_directory_into_ram(self, directory_path: str):
-        """
-        Load all .pth files in a directory into RAM in order.
+    def load_directory_into_ram(self, directory_path: str) -> dict:
+        """Load all .pth files in a directory into RAM in order.
 
         Args:
-            directory_path (str): Path to the directory containing .pth files.
+            directory_path: Path to the directory containing .pth files.
 
         Returns:
-            dict: A dictionary where keys are file indices (e.g., 0, 1, 2) and values are the loaded tensors.
+            Dictionary where keys are file indices (e.g., 0, 1, 2) and values are the loaded tensors.
         """
         # Get all .pth files in the directory, sorted by numeric order
         file_names = sorted(
@@ -229,7 +230,7 @@ class RadarData(Dataset):
         print(f"Loaded {len(tensor_dict)} files into RAM.")
         return tensor_dict
     
-    def random_zero_mask(self, radar):
+    def random_zero_mask(self, radar: torch.Tensor) -> torch.Tensor:
         """Randomly masks parts of the tensor with zeros while keeping the original size."""
         D, A, E, R, T = radar.shape
         d_mask = int(D * self.mask_ratio)
@@ -248,25 +249,25 @@ class RadarData(Dataset):
 
         return radar * mask  # Apply masking
 
-    def add_gaussian_noise(self, radar, noise_std=0.05):
+    def add_gaussian_noise(self, radar: torch.Tensor, noise_std: float = 0.05) -> torch.Tensor:
         """Adds Gaussian noise (size remains unchanged)."""
         noise = torch.randn_like(radar) * noise_std
         return radar + noise
 
-    def random_time_masking(self, radar, mask_prob=0.2):
+    def random_time_masking(self, radar: torch.Tensor, mask_prob: float = 0.2) -> torch.Tensor:
         """Randomly masks some time steps (size remains unchanged)."""
         mask = (torch.rand(radar.shape[-1]) > mask_prob).float()
         return radar * mask.view(1, 1, 1, 1, -1)  # Apply across all dimensions
 
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        """ method to get train and validation data
+    def __getitem__(self, idx: int) -> tuple:
+        """Get train and validation data by index.
 
         Args:
-            idx (int): indx of data 
+            idx: Index of the data sample.
 
         Returns:
-            torch.Tensor: model input and target
+            Tuple of (radar input tensor, ground truth target tensor).
         """
         
         # get radar 

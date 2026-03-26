@@ -1,32 +1,33 @@
+from typing import Any, Dict, List, Optional, Tuple, Type
+
+import normflows as nf
+from normflows import nets
+from normflows.flows import ActNorm, BatchNorm, Invertible1x1Conv, MaskedAffineFlow, Planar, Radial
+from normflows.nets import MLP
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from yacs.config import CfgNode as CN
+
 from common import *
 from hrnet3D_config import *
 from hrnet3D_config_4D import MODEL_CONFIGS as cfg_4D
-from yacs.config import CfgNode as CN
-import torch
-import normflows as nf
-from normflows.flows import Planar, Radial, MaskedAffineFlow, BatchNorm
-from normflows import nets
-from normflows.flows import ActNorm
-from normflows.flows import ActNorm, Invertible1x1Conv
-from normflows.nets import MLP
 from transformer import Transformer
 
 
 class HighResolutionModule(nn.Module):
     def __init__(
         self,
-        num_branches,
-        blocks,
-        num_blocks,
-        num_inchannels,
-        num_channels,
-        fuse_method,
-        multi_scale_output=True,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        num_branches: int,
+        blocks: Type[nn.Module],
+        num_blocks: List[int],
+        num_inchannels: List[int],
+        num_channels: List[int],
+        fuse_method: str,
+        multi_scale_output: bool = True,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> None:
         super(HighResolutionModule, self).__init__()
         self._check_branches(
             num_branches, blocks, num_blocks, num_inchannels, num_channels
@@ -52,8 +53,8 @@ class HighResolutionModule(nn.Module):
         self.relu = nn.ReLU(inplace=False)
 
     def _check_branches(
-        self, num_branches, blocks, num_blocks, num_inchannels, num_channels
-    ):
+        self, num_branches: int, blocks: Type[nn.Module], num_blocks: List[int], num_inchannels: List[int], num_channels: List[int]
+    ) -> None:
         if num_branches != len(num_blocks):
             error_msg = "NUM_BRANCHES({}) <> NUM_BLOCKS({})".format(
                 num_branches, len(num_blocks)
@@ -77,14 +78,14 @@ class HighResolutionModule(nn.Module):
 
     def _make_one_branch(
         self,
-        branch_index,
-        block,
-        num_blocks,
-        num_channels,
-        stride=1,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        branch_index: int,
+        block: Type[nn.Module],
+        num_blocks: List[int],
+        num_channels: List[int],
+        stride: int = 1,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> nn.Sequential:
         downsample = None
         if (
             stride != 1
@@ -127,8 +128,8 @@ class HighResolutionModule(nn.Module):
         return nn.Sequential(*layers)
 
     def _make_branches(
-        self, num_branches, block, num_blocks, num_channels, bn_type, bn_momentum=0.1
-    ):
+        self, num_branches: int, block: Type[nn.Module], num_blocks: List[int], num_channels: List[int], bn_type: Optional[str] = None, bn_momentum: float = 0.1
+    ) -> nn.ModuleList:
         branches = []
         for i in range(num_branches):
             branches.append(
@@ -144,7 +145,7 @@ class HighResolutionModule(nn.Module):
 
         return nn.ModuleList(branches)
 
-    def _make_fuse_layers(self, bn_type, bn_momentum=0.1):
+    def _make_fuse_layers(self, bn_type: Optional[str], bn_momentum: float = 0.1) -> Optional[nn.ModuleList]:
         if self.num_branches == 1:
             return None
         num_branches = self.num_branches
@@ -211,10 +212,10 @@ class HighResolutionModule(nn.Module):
 
         return nn.ModuleList(fuse_layers)
 
-    def get_num_inchannels(self):
+    def get_num_inchannels(self) -> List[int]:
         return self.num_inchannels
 
-    def forward(self, x):
+    def forward(self, x: List[torch.Tensor]) -> List[torch.Tensor]:
         if self.num_branches == 1:
             return [self.branches[0](x[0])]
 
@@ -244,7 +245,7 @@ class HighResolutionModule(nn.Module):
 
 
 class HighResolution3DNet(nn.Module):
-    def __init__(self, cfg, bn_type=None, bn_momentum=None, **kwargs):
+    def __init__(self, cfg: Dict[str, Any], bn_type: Optional[str] = None, bn_momentum: Optional[float] = None, **kwargs: Any) -> None:
         super(HighResolution3DNet, self).__init__()
         if kwargs['full_res_stem']:
             self.full_res_stem = kwargs['full_res_stem']
@@ -296,8 +297,8 @@ class HighResolution3DNet(nn.Module):
             )
 
     def _make_transition_layer(
-        self, num_channels_pre_layer, num_channels_cur_layer, bn_type, bn_momentum
-    ):
+        self, num_channels_pre_layer: List[int], num_channels_cur_layer: List[int], bn_type: Optional[str] = None, bn_momentum: Optional[float] = None
+    ) -> nn.ModuleList:
         num_branches_cur = len(num_channels_cur_layer)
         num_branches_pre = len(num_channels_pre_layer)
         transition_layers = []
@@ -344,12 +345,12 @@ class HighResolution3DNet(nn.Module):
 
     def _make_stage(
         self,
-        layer_config,
-        num_inchannels,
-        multi_scale_output=True,
-        bn_type=None,
-        bn_momentum=0.1,
-    ):
+        layer_config: Dict[str, Any],
+        num_inchannels: List[int],
+        multi_scale_output: bool = True,
+        bn_type: Optional[str] = None,
+        bn_momentum: float = 0.1,
+    ) -> Tuple[nn.Sequential, List[int]]:
         num_modules = layer_config["NUM_MODULES"]
         num_branches = layer_config["NUM_BRANCHES"]
         num_blocks = layer_config["NUM_BLOCKS"]
@@ -382,7 +383,7 @@ class HighResolution3DNet(nn.Module):
 
         return nn.Sequential(*modules), num_inchannels
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         x = self.layer1(x)
         x_list = []
         for i in range(self.stage2_cfg["NUM_BRANCHES"]):
@@ -411,7 +412,7 @@ class HighResolution3DNet(nn.Module):
         return y_list
 
 class ResidualMLP(nn.Module):
-    def __init__(self, dim):
+    def __init__(self, dim: int) -> None:
         super().__init__()
         self.block = nn.Sequential(
             nn.Linear(dim, dim // 4),
@@ -419,16 +420,18 @@ class ResidualMLP(nn.Module):
             nn.Linear(dim // 4, dim)
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x + self.block(x)
-    
+
 
 class SimpleFlowModel(nn.Module):
-    def __init__(self, flows):
+    """Wrapper for normalizing flow transformations."""
+
+    def __init__(self, flows: List[nn.Module]) -> None:
         super().__init__()
         self.flows = nn.ModuleList(flows)
 
-    def forward(self, z):
+    def forward(self, z: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         ld = torch.zeros(z.shape[0], device=z.device)
         for flow in self.flows:
             z, ld_ = flow(z)
@@ -436,7 +439,9 @@ class SimpleFlowModel(nn.Module):
         return z, ld
 
 class RadProPoserVAENF(nn.Module):
-    def __init__(self):
+    """VAE-based radar pose estimator with normalizing flow posterior for flexible uncertainty modeling."""
+
+    def __init__(self) -> None:
         super(RadProPoserVAENF, self).__init__()
 
         # backbone 
@@ -492,26 +497,26 @@ class RadProPoserVAENF(nn.Module):
         eps = torch.randn_like(std).to(device) * self.varianceScaling 
         return mu + eps * std
 
-    def preProcess(self, 
-                   x: torch.Tensor):
+    def preProcess(self,
+                   x: torch.Tensor) -> torch.Tensor:
         x = x - torch.mean(x, dim = -1, keepdim = True)
         x = torch.fft.fft(torch.fft.fft(torch.fft.fft(torch.fft.fft(x ,dim = -1,  norm = "forward"), dim = -2,  norm = "forward"), dim = -3,  norm = "forward"), dim = -4,  norm = "forward")
-        x = x.permute(0, 1, 5, 2, 3, 4) 
+        x = x.permute(0, 1, 5, 2, 3, 4)
         return x
 
-    def applyBackbone(self, x: torch.Tensor):
+    def applyBackbone(self, x: torch.Tensor) -> torch.Tensor:
         featureList = self.backbone(x)
         features = [F.interpolate(feature.float(), size=(4, 4, 64), mode='trilinear') for feature in featureList]
         features = torch.cat(features, dim=1)
         features = self.bottleNeck(features)
         return features
 
-    def sampleLatent(self, mu: torch.Tensor, sigma: torch.Tensor, alpha: float = None)->torch.Tensor:
+    def sampleLatent(self, mu: torch.Tensor, sigma: torch.Tensor, alpha: Optional[float] = None) -> torch.Tensor:
         if alpha is not None:
             self.varianceScaling = torch.tensor(alpha)
         return self.sample(mu, sigma)
 
-    def getLatent(self, x: torch.Tensor)-> tuple[torch.Tensor, torch.Tensor]:
+    def getLatent(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.preProcess(x)
         xComp = [x.real, x.imag]
         spatFeat = [self.applyBackbone(elmt[:, i].float()) for elmt in xComp for i in range(elmt.size(1))]
@@ -524,9 +529,9 @@ class RadProPoserVAENF(nn.Module):
         return mu, sigma 
 
 
-    def forward(self, 
-                x: torch.Tensor, 
-                inference: bool = False):
+    def forward(self,
+                x: torch.Tensor,
+                inference: bool = False) -> Tuple[torch.Tensor, ...]:
         
         if inference == False:
             mu, logvar = self.getLatent(x)
@@ -583,9 +588,9 @@ class RadProPoserVAENF(nn.Module):
 
             return mu_out, var_out, decoded
         
-    def forward_inference(self, 
+    def forward_inference(self,
                       x: torch.Tensor,
-                      n_samples: int = 500):
+                      n_samples: int = 500) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Optimized forward for inference with batch_size=1.
         - Batches all backbone calls into single forward pass

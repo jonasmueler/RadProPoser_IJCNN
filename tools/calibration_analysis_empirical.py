@@ -1,29 +1,21 @@
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
-from typing import List, Optional, Callable
+import os
 from functools import partial
+from typing import Callable, List, Optional
 
-from scipy.stats import t, norm
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+from scipy.interpolate import interp1d
+from scipy.stats import norm, t
 from sklearn.isotonic import IsotonicRegression
 from sklearn.model_selection import KFold
 
-import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import t
-from sklearn.isotonic import IsotonicRegression
-from typing import List
-import numpy as np
-from scipy.stats import norm
-from scipy.interpolate import interp1d
-import os
-import joblib
-# Disable scientific notation
 np.set_printoptions(suppress=True)
-# Optional: Only include these if you actually use them
-# from sklearn.linear_model import Ridge, Lasso, ElasticNet
 
 class MultiModelRecalibrationVisualizer:
+    """Empirical recalibration of predictive uncertainty using isotonic regression on sample-based CDFs."""
+
     def __init__(self, num_dims: int):
         self.num_dims = num_dims
         self.models = {
@@ -87,10 +79,17 @@ class MultiModelRecalibrationVisualizer:
 
         return cdf_y
 
-    def _fit_models(self, 
-                    gt: np.ndarray, 
+    def _fit_models(self,
+                    gt: np.ndarray,
                     cdf: np.ndarray,
                     clip_percentile: float = 0.01):
+        """Fit isotonic regression models per dimension on empirical CDF values.
+
+        Args:
+            gt: Ground truth of shape (B, D).
+            cdf: Samples of shape (B, D, S) for computing empirical CDFs.
+            clip_percentile: Fraction of extreme CDF values to exclude.
+        """
         cdf = self._get_cdf_at_y(cdf, gt)
 
         for model_type in self.models:
@@ -110,10 +109,20 @@ class MultiModelRecalibrationVisualizer:
                 model = self.models[model_type][d]
                 model.fit(x_clip, y_clip)
 
-    def _apply_model(self, 
+    def _apply_model(self,
                      gt: np.ndarray,
-                     cdf: np.ndarray, 
+                     cdf: np.ndarray,
                      model_type: str) -> np.ndarray:
+        """Apply a fitted recalibration model to transform empirical CDF values.
+
+        Args:
+            gt: Ground truth of shape (B, D).
+            cdf: Samples of shape (B, D, S).
+            model_type: Key into self.models (e.g., "isotonic").
+
+        Returns:
+            Recalibrated CDF values of shape (B, D).
+        """
         cdf = self._get_cdf_at_y(cdf, gt)
         if model_type == "rf_joint":
             return self.models[model_type].predict(cdf).reshape(cdf.shape)
@@ -131,6 +140,7 @@ class MultiModelRecalibrationVisualizer:
         num_bins: int = 50,
         font_scale: float = 4,
     ):
+        """Plot calibration coverage curves comparing uncalibrated vs recalibrated models."""
         expected_p = np.linspace(0.0, 1.0, num_bins + 1)[1:-1]
         base_fontsize = 10 * font_scale
         plt.rcParams.update({
@@ -169,12 +179,14 @@ class MultiModelRecalibrationVisualizer:
         plt.show()
 
     def _compute_calibration_error(self, cdf: np.ndarray, num_bins: int = 100) -> float:
+        """Compute expected calibration error (ECE) as mean absolute deviation from perfect calibration."""
         expected_p = np.linspace(0.01, 0.99, num_bins)
         flat = cdf.flatten()
         observed_p = np.array([(flat <= p).mean() for p in expected_p])
         return np.mean(np.abs(observed_p - expected_p))
 
     def run(self, mu: np.ndarray, var: np.ndarray, gt: np.ndarray):
+        """Fit recalibration models and plot calibration coverage on the same data."""
         cdf_uncal = self._get_cdf(mu, np.sqrt(var), gt)
         self._fit_models(mu, var, gt)
 
@@ -190,6 +202,7 @@ class MultiModelRecalibrationVisualizer:
         )
 
     def quantify_improvement(self, mu: np.ndarray, var: np.ndarray, gt: np.ndarray):
+        """Fit models and print calibration error before and after recalibration."""
         cdf_uncal = self._get_cdf(mu, np.sqrt(var), gt)
         self._fit_models(mu, var, gt)
 
@@ -200,6 +213,7 @@ class MultiModelRecalibrationVisualizer:
             print(f"Calibration Error (Recalibrated - {model_type}): {err:.6f}")
 
     def quantify_improvement_Kfold(self, mu: np.ndarray, var: np.ndarray, gt: np.ndarray, n_splits: int = 2):
+        """Evaluate recalibration improvement using K-fold cross-validation."""
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
 
         unc_errors = []
@@ -279,7 +293,19 @@ class MultiModelRecalibrationVisualizer:
     
     def fast_nongaussian_variance(self, mu, sigma, recalibrator,
                               L=4, G=200, P=200):
+        """Estimate recalibrated variance via quantile integration of the calibrated inverse CDF.
 
+        Args:
+            mu: Predictive mean.
+            sigma: Predictive standard deviation.
+            recalibrator: Fitted recalibrator model with predict() method.
+            L: Range multiplier for the y-grid.
+            G: Number of points in the y-grid.
+            P: Number of points in the probability grid.
+
+        Returns:
+            Estimated recalibrated variance.
+        """
         # 1. y-grid
         y = np.linspace(mu - L*sigma, mu + L*sigma, G)
         # 2. calibrated CDF
