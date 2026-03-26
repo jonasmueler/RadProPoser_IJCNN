@@ -1,6 +1,6 @@
 
 # RadProPoser: Probabilistic Radar Tensor Human Pose Estimation That Knows Its Limits
- 
+
 <div align="center">
   <img src="assets/overview.png" alt="Project Overview" width="1000">
 </div>
@@ -38,7 +38,7 @@ To get started with the project, follow the steps below:
 1. **Set up a virtual environment**:
    ```bash
    python -m venv venv
-   source venv/bin/activate  
+   source venv/bin/activate
    ```
 
 2. **Install torch with cuda_12.4**:
@@ -52,7 +52,7 @@ To get started with the project, follow the steps below:
    ```
 
 4. **Download data**:
-   Our data can be downloaded anonymously here: https://doi.org/10.5281/zenodo.14035103. Place our dataset in the `/data` folder. Refer to `radar_raw_data/README.md` for dataset details.
+   Our data can be downloaded anonymously here: https://doi.org/10.5281/zenodo.14035103. Place our dataset in the `data/` folder.
 
 ---
 
@@ -95,9 +95,20 @@ This section describes how to reproduce our experiments on the HuPR dataset. All
 ### 1. Configuration
 Configure paths in `HuPR-A-Benchmark-for-Human-Pose-Estimation-Using-Millimeter-Wave-Radar/config.py`:
 - Set `DATA_DIR` to your HuPR data directory (download from [HuPR GitHub](https://github.com/robert80203/HuPR-A-Benchmark-for-Human-Pose-Estimation-Using-Millimeter-Wave-Radar))
-- Set `HUPR_CHECKPOINT_PATH` to the HuPR pretrained weights (download from [HuPR releases](https://github.com/robert80203/HuPR-A-Benchmark-for-Human-Pose-Estimation-Using-Millimeter-Wave-Radar/releases))
 
-### 2. Data Preparation
+### 2. MotionBERT Setup
+The 3D ground truth generation and 2D-to-3D lifting steps require the [MotionBERT](https://github.com/Walter0807/MotionBERT) library and pretrained weights:
+1. Clone the MotionBERT repository and copy its `lib/` directory into `HuPR-.../MotionBERT/`:
+   ```bash
+   git clone https://github.com/Walter0807/MotionBERT.git /tmp/MotionBERT
+   cp -r /tmp/MotionBERT/lib HuPR-A-Benchmark-for-Human-Pose-Estimation-Using-Millimeter-Wave-Radar/MotionBERT/lib
+   ```
+2. Download the MotionBERT pretrained checkpoint (`FT_MB_release_MB_ft_h36m`) from the [MotionBERT releases](https://github.com/Walter0807/MotionBERT/releases) and place it at:
+   ```
+   HuPR-.../MotionBERT/checkpoint/pose3d/FT_MB_release_MB_ft_h36m/best_epoch.bin
+   ```
+
+### 3. Data Preparation
 Process the raw radar data and generate 3D ground truth annotations:
 ```bash
 cd HuPR-A-Benchmark-for-Human-Pose-Estimation-Using-Millimeter-Wave-Radar
@@ -109,29 +120,31 @@ python preprocessing/process_full_radar.py
 python preprocessing/generate_3d_gt.py
 ```
 
-### 3. Training
+### 4. Training
 Train the RadProPoserVAECov model on HuPR radar data:
 ```bash
 python train.py
 ```
 Checkpoints are saved to `checkpoints/`. Training uses Weights and Biases (wandb) for logging.
 
-### 4. Testing
+### 5. Testing
 Evaluate the trained model with MPJPE, PA-MPJPE, Sharpness, and ECE metrics:
 ```bash
 python test.py
 ```
 
-### 5. Recalibration
+### 6. Recalibration
 Run uncertainty recalibration on the trained model:
 ```bash
 python scripts/recalibrate.py
 ```
 
-### 6. HuPR 2D-to-3D Lifting Baseline
-To evaluate the HuPR model's 2D predictions lifted to 3D (baseline comparison):
+### 7. HuPR 2D-to-3D Lifting Baseline
+To evaluate the HuPR model's 2D predictions lifted to 3D (baseline comparison), you need pretrained HuPR 2D weights. Either download them from [HuPR releases](https://github.com/robert80203/HuPR-A-Benchmark-for-Human-Pose-Estimation-Using-Millimeter-Wave-Radar/releases) and place at `logs/hupr_pretrained/model_best.pth`, or retrain from scratch with `python main.py --config mscsa_prgcn.yaml --dir hupr_pretrained`.
+
+Then run inference and evaluation:
 ```bash
-# Run HuPR 2D inference
+# Run HuPR 2D inference on test set
 python scripts/run_hupr_inference.py
 
 # Lift 2D predictions to 3D using MotionBERT
@@ -140,7 +153,3 @@ python scripts/lift_to_3d.py
 # Evaluate 3D pose accuracy
 python scripts/evaluate_3d.py
 ```
-
-
-
-

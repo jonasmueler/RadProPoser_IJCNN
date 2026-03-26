@@ -3,6 +3,10 @@ import random
 import sys
 import warnings
 
+# Ensure tools/ directory is on the path so local imports resolve
+# regardless of which directory the script is invoked from.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import numpy as np
 import torch
 import torch.nn as nn
