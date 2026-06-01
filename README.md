@@ -23,12 +23,11 @@ RadProPoser/
 │   └── hrnet3D_config.py             # HRNet architecture configs
 ├── tools/                            # Training, testing, calibration scripts
 │   ├── config.py                     # Central configuration + MODEL_REGISTRY
-│   ├── trainScript.py                # Training entry point
-│   ├── trainLoop.py                  # Training loop, checkpoint I/O
+│   ├── train_script.py               # Training entry point
+│   ├── train_loop.py                 # Training loop, checkpoint I/O
 │   ├── testing.py                    # Test set evaluation
 │   ├── losses.py                     # Loss functions (NLL, KL, Laplace)
-│   ├── metrics.py                    # MPJPE metric
-│   ├── dataLoaders.py                # Dataset and data loading
+│   ├── data_loaders.py              # Dataset and data loading
 │   ├── calibration_test.py           # Recalibration analysis
 │   ├── calibration_analysis.py       # Calibration metrics
 │   └── inference_time.py             # Inference benchmarking
@@ -89,7 +88,7 @@ The training data (unfolded sequences) is automatically generated based on speci
 
 Create data and train the model:
 ```bash
-python tools/trainScript.py
+python tools/train_script.py
 ```
 
 ### 3. Testing
@@ -170,4 +169,19 @@ python scripts/lift_to_3d.py
 
 # Evaluate 3D pose accuracy
 python scripts/evaluate_3d.py
+```
+
+---
+
+## Citation
+
+If you find this work useful, please cite:
+
+```bibtex
+@inproceedings{mueller2025radproposer,
+  title={RadProPoser: Probabilistic Radar Tensor Human Pose Estimation That Knows Its Limits},
+  author={Mueller, Jonas Leo and Engel, Lukas and Dorschky, Eva and Krauss, Daniel and Ullmann, Ingrid and Vossiek, Martin and Eskofier, Bjoern M.},
+  booktitle={International Joint Conference on Neural Networks (IJCNN)},
+  year={2025}
+}
 ```

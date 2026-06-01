@@ -8,7 +8,6 @@ from edl_pytorch import evidential_regression
 
 from config import MODELNAME, NUM_COORDS, NUM_JOINTS, PATHORIGIN, TRAINCONFIG
 from losses import kl_loss, laplace_nll, nll_from_cov, nll_loss
-from metrics import mpjpe
 
 
 def save_checkpoint(
@@ -69,7 +68,6 @@ def lr_lambda(epoch: int) -> float:
 
 def train_loop(
     train_loader: torch.utils.data.DataLoader,
-    val_loader: torch.utils.data.DataLoader,
     model: nn.Module,
     load_model: bool,
     model_name: str,
@@ -82,7 +80,6 @@ def train_loop(
 
     Args:
         train_loader: DataLoader for the training dataset.
-        val_loader: DataLoader for the validation dataset.
         model: The neural network model to be trained.
         load_model: Whether to load a previously saved model checkpoint.
         model_name: The name of the model used for saving checkpoints and logging.
@@ -213,49 +210,9 @@ def train_loop(
 
         scheduler.step()
 
-        # Validation
-        with torch.no_grad():
-            print("start validating model")
-            val_loss_mean = 0
-            counter = 0
-            for x, y in val_loader:
-                model.eval()
-                x = x.to(device).to(torch.complex64)
-                y = y.to(device).float() * 100
+        checkpoint_path = os.path.join(
+            "trainedModels", model_name, model_name + str(b)
+        )
+        save_checkpoint(model, optimizer, checkpoint_path)
 
-                if TRAINCONFIG["nll"]:
-                    _, _, _, preds, _ = model.forward(x)
-                elif TRAINCONFIG["nf"]:
-                    preds, _, _ = model.forward(x, inference=True)
-                elif TRAINCONFIG["evd"]:
-                    preds, _ = model(x)
-                    preds = preds[0]
-                elif TRAINCONFIG.get("HR_SINGLE"):
-                    root, offset = model(x)
-                    preds = root.unsqueeze(dim=1) + offset
-                    preds = torch.cat([root.unsqueeze(dim=1), preds], dim=1)
-                    y = y.reshape(y.size(0), NUM_JOINTS, NUM_COORDS)
-                else:
-                    preds = model.forward(x)
-
-                val_loss = mpjpe(preds, y)
-                val_loss_mean += val_loss
-                counter += 1
-
-            val_losses = val_loss_mean / counter + 1
-
-            if use_wandb:
-                wandb.log({"valLoss": val_losses.detach().cpu().item()})
-            print("valLoss: ", val_losses.detach().cpu().item())
-
-            checkpoint_path = os.path.join(
-                "trainedModels", model_name, model_name + str(b)
-            )
-            save_checkpoint(model, optimizer, checkpoint_path)
-
-    final_checkpoint_path = os.path.join(
-        "trainedModels", model_name, model_name + str(b)
-    )
-    save_checkpoint(model, optimizer, final_checkpoint_path)
-    print("Model saved!")
     print("Training done!")

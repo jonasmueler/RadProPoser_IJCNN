@@ -11,8 +11,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-import dataLoaders
-import trainLoop
+import data_loaders
+import train_loop
 from config import (
     MODEL_REGISTRY, MODELNAME, MODELPATH, PATHRAW, SEQLEN, TRAINCONFIG,
 )
@@ -56,18 +56,11 @@ print(f"Non-trainable parameters: {non_trainable_params}")
 
 # get data loaders
 single_frame_mode = TRAINCONFIG.get("HR_SINGLE", False)
-dataset_train = dataLoaders.RadarData(
+dataset_train = data_loaders.RadarData(
     "train", PATHRAW, PATHRAW, SEQLEN, single_frame=single_frame_mode
 )
 data_train = DataLoader(
     dataset_train, TRAINCONFIG["batchSize"], shuffle=True, num_workers=1
-)
-
-dataset_val = dataLoaders.RadarData(
-    "val", PATHRAW, PATHRAW, SEQLEN, single_frame=single_frame_mode
-)
-data_val = DataLoader(
-    dataset_val, TRAINCONFIG["batchSize"], shuffle=True, num_workers=1
 )
 
 mse = torch.nn.MSELoss()
@@ -75,7 +68,7 @@ mse = torch.nn.MSELoss()
 
 if __name__ == "__main__":
     set_seed(42)
-    trainLoop.train_loop(
-        data_train, data_val, model, False, MODELNAME,
+    train_loop.train_loop(
+        data_train, model, False, MODELNAME,
         TRAINCONFIG, True, TRAINCONFIG["device"], mse,
     )

@@ -9,7 +9,7 @@ import torch
 from scipy.interpolate import interp1d
 from scipy.stats import norm, t
 from sklearn.isotonic import IsotonicRegression
-from sklearn.model_selection import KFold
+
 
 from config import NUM_COORDS, NUM_JOINTS
 
@@ -186,59 +186,6 @@ class MultiModelRecalibrationVisualizer:
         flat = cdf.flatten()
         observed_p = np.array([(flat <= p).mean() for p in expected_p])
         return np.mean(np.abs(observed_p - expected_p))
-
-    def run(self, mu: np.ndarray, var: np.ndarray, gt: np.ndarray):
-        """Fit recalibration models and plot calibration coverage on the same data."""
-        cdf_uncal = self._get_cdf(mu, np.sqrt(var), gt)
-        self._fit_models(mu, var, gt)
-
-        cdf_calibrated = {
-            model_type: self._apply_model(mu, var, gt, model_type)
-            for model_type in self.models
-        }
-
-        self._plot_calibration_coverage(
-            cdf_uncal=cdf_uncal,
-            cdf_cal_dict=cdf_calibrated,
-            model_labels=["Uncalibrated"] + [f"Recalibrated ({m})" for m in self.models.keys()],
-        )
-
-    def quantify_improvement(self, mu: np.ndarray, var: np.ndarray, gt: np.ndarray):
-        """Fit models and print calibration error before and after recalibration."""
-        cdf_uncal = self._get_cdf(mu, np.sqrt(var), gt)
-        self._fit_models(mu, var, gt)
-
-        print(f"Calibration Error (Uncalibrated): {self._compute_calibration_error(cdf_uncal):.6f}")
-        for model_type in self.models:
-            cdf_cal = self._apply_model(mu, var, gt, model_type)
-            err = self._compute_calibration_error(cdf_cal)
-            print(f"Calibration Error (Recalibrated - {model_type}): {err:.6f}")
-
-    def quantify_improvement_Kfold(self, mu: np.ndarray, var: np.ndarray, gt: np.ndarray, n_splits: int = 2):
-        """Evaluate recalibration improvement using K-fold cross-validation."""
-        kf = KFold(n_splits=n_splits, shuffle=True, random_state=42)
-
-        unc_errors = []
-        cal_errors = {model_type: [] for model_type in self.models}
-
-        for train_idx, val_idx in kf.split(mu):
-            mu_train, var_train, gt_train = mu[train_idx], var[train_idx], gt[train_idx]
-            mu_val, var_val, gt_val = mu[val_idx], var[val_idx], gt[val_idx]
-
-            self._fit_models(mu_train, var_train, gt_train)
-
-            cdf_uncal = self._get_cdf(mu_val, np.sqrt(var_val), gt_val)
-            unc_errors.append(self._compute_calibration_error(cdf_uncal))
-
-            for model_type in self.models:
-                cdf_cal = self._apply_model(mu_val, var_val, gt_val, model_type)
-                cal_errors[model_type].append(self._compute_calibration_error(cdf_cal))
-
-        print(f"Cross-Validated Calibration Error (Uncalibrated): {np.mean(unc_errors):.6f} ± {np.std(unc_errors):.6f}")
-        for model_type in self.models:
-            mean_err = np.mean(cal_errors[model_type])
-            std_err = np.std(cal_errors[model_type])
-            print(f"Cross-Validated Calibration Error (Recalibrated - {model_type}): {mean_err:.6f} ± {std_err:.6f}")
 
     def run_with_holdout(
         self,

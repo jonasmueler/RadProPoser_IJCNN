@@ -43,7 +43,7 @@ lightning_logs/
 
 # Datasets (add specific dataset folders as needed)
 data/
-datasets/
+/datasets/
 raw_data/
 processed_data/
 *.csv

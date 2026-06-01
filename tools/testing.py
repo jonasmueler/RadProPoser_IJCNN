@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-import trainLoop
+import train_loop
 from config import (
     MODEL_REGISTRY, MODELNAME, MODELPATH, NUM_COORDS, NUM_DIMS, NUM_JOINTS,
     PATHORIGIN, PATHRAW, SEQLEN, TRAINCONFIG,
@@ -329,7 +329,7 @@ class RadarPoseTester:
         Encoder = getattr(importlib.import_module(module_name), class_name)
 
         self.model = Encoder().to(self.device)
-        self.model = trainLoop.load_checkpoint(self.model, None, model_path)
+        self.model = train_loop.load_checkpoint(self.model, None, model_path)
         self.model.eval()
         all_preds, all_gts, all_vars, all_ensembles = [], [], [], []
         val_preds, val_gts, val_vars, val_ensembles = [], [], [], []
