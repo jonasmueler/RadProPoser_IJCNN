@@ -86,5 +86,6 @@ if PATH_ORIGIN is None:
 if PATH_RAW is None:
     raise ValueError("PATH_RAW must be set in config.py")
 
-MODEL_PATH = os.path.join(PATH_ORIGIN, "models")
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(_REPO_ROOT, "models")
 HP_ECKPT = os.path.join(PATH_ORIGIN, "trainedModels", "humanPoseEstimation")
