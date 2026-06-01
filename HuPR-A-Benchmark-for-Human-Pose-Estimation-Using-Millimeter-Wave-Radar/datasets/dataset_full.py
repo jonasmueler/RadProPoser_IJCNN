@@ -1,13 +1,13 @@
 import json
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import yaml
 from torch.utils.data import DataLoader, Dataset
 
-from config import DATA_DIR, RADAR_FULL_DIR, ANNOT_DIR, TRAINCONFIG
+from config import DATA_DIR, RADAR_FULL_DIR, ANNOT_DIR, TRAIN_CONFIG
 
 CONFIG_PATH = Path(__file__).parent.parent / "config" / "mscsa_prgcn.yaml"
 
@@ -61,7 +61,11 @@ class HuPRFullRadar(Dataset):
         self.samples = self._build_sample_index()
 
     def _get_available_sequences(self) -> List[int]:
-        """Get sequence IDs that have both radar data and are in this phase."""
+        """Get sequence IDs that have both radar data and are in this phase.
+
+        Returns:
+            Sorted list of sequence IDs present in both radar data and phase config.
+        """
         radar_seqs = {
             int(p.name.split("_")[1]) for p in RADAR_FULL_DIR.glob("single_*")
         }
@@ -74,7 +78,7 @@ class HuPRFullRadar(Dataset):
         Returns:
             Dictionary mapping seq_id to list of (17, 3) pose arrays
         """
-        gt_source = TRAINCONFIG.get("gt_source", "motionbert")
+        gt_source = TRAIN_CONFIG.get("gt_source", "motionbert")
         annot_file = ANNOT_DIR / f"{gt_source}_3d_{self.phase}.json"
 
         with open(annot_file) as f:
@@ -113,6 +117,11 @@ class HuPRFullRadar(Dataset):
         return samples
 
     def __len__(self) -> int:
+        """Return the total number of samples in the dataset.
+
+        Returns:
+            Number of samples.
+        """
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
@@ -148,7 +157,7 @@ def get_dataloader(
     seq_len: int = 16,
     stride: int = 1,
     num_workers: int = 4,
-    shuffle: bool = None,
+    shuffle: Optional[bool] = None,
 ) -> DataLoader:
     """Create dataloader for full radar dataset.
 

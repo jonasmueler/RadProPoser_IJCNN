@@ -20,7 +20,8 @@ RadProPoser/
 │   ├── evidential_pose_regression.py # RadProPoserEvidential (evidential DL)
 │   ├── normalizing_flow.py           # RadProPoserVAENF (normalizing flow)
 │   ├── transformer.py                # Transformer for temporal aggregation
-│   └── hrnet3D_config.py             # HRNet architecture configs
+│   ├── hrnet3D_config.py             # HRNet architecture configs
+│   └── hrnet3D_config_4D.py          # HRNet configs for 4D (single-frame) models
 ├── tools/                            # Training, testing, calibration scripts
 │   ├── config.py                     # Central configuration + MODEL_REGISTRY
 │   ├── train_script.py               # Training entry point
@@ -28,8 +29,9 @@ RadProPoser/
 │   ├── testing.py                    # Test set evaluation
 │   ├── losses.py                     # Loss functions (NLL, KL, Laplace)
 │   ├── data_loaders.py              # Dataset and data loading
-│   ├── calibration_test.py           # Recalibration analysis
-│   ├── calibration_analysis.py       # Calibration metrics
+│   ├── calibration_test.py           # Recalibration entry point
+│   ├── calibration_analysis.py       # Parametric recalibration
+│   ├── calibration_analysis_empirical.py  # Empirical recalibration
 │   └── inference_time.py             # Inference benchmarking
 ├── trainedModels/                    # Pretrained model weights
 ├── HuPR-.../                         # HuPR dataset experiments
@@ -43,6 +45,7 @@ RadProPoser/
 │   ├── misc/                         # Losses, metrics, utilities
 │   ├── recalibration/                # Uncertainty recalibration
 │   └── MotionBERT/                   # 2D-to-3D lifting model
+├── LICENSE.txt
 └── requirements.txt
 ```
 
@@ -77,9 +80,9 @@ To get started with the project, follow the steps below:
 
 ### 1. Configuration
 Before training or testing, configure the model in `tools/config.py`:
-- Set `MODELNAME` to the model you want to train. default is the best performing model as described in the paper
-- Set `PATHORIGIN` to your data root path
-- Set `PATHRAW` to your raw radar data path
+- Set `MODEL_NAME` to the model you want to train. default is the best performing model as described in the paper
+- Set `PATH_ORIGIN` to your data root path
+- Set `PATH_RAW` to your raw radar data path
 
 The dataloader currently includes all training participants, including the original validation participant, because the hyperparameters are already optimized and we aim for maximum performance on the held-out test set. If you want to tune your own hyperparameters, remove the validation participant from the training set to restore a proper validation split and track generalization each epoch.
 

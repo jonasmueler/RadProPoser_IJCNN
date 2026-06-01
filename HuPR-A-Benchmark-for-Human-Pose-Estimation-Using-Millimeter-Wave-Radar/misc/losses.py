@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from config import TRAINCONFIG
+from config import TRAIN_CONFIG
 from misc.metrics import get_max_preds
 from misc.utils import generateTarget
 
@@ -54,7 +54,7 @@ def nll_from_cov(
 
     nll = 0.5 * (maha + logdet + K * np.log(2.0 * np.pi))  # (B,)
 
-    pen = TRAINCONFIG["gamma"] * cov.diagonal(dim1=-2, dim2=-1).mean(dim=-1)  # (B,)
+    pen = TRAIN_CONFIG["gamma"] * cov.diagonal(dim1=-2, dim2=-1).mean(dim=-1)  # (B,)
 
     return nll.mean() + pen.mean(), pen.mean()
 

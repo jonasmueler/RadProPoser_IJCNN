@@ -120,7 +120,7 @@ Train the 3D pose model with uncertainty estimation:
 python train.py
 ```
 
-Configuration is in `config.py` under `TRAINCONFIG`.
+Configuration is in `config.py` under `TRAIN_CONFIG`.
 
 ### 5. Evaluate
 
@@ -148,13 +148,13 @@ python scripts/recalibrate.py
 All settings are centralized in `config.py`:
 
 ```python
-TRAINCONFIG = {
-    "learningRate": 0.001,
+TRAIN_CONFIG = {
+    "learning_rate": 0.001,
     "epochs": 50,
-    "batchSize": 16,
+    "batch_size": 16,
     "beta": 20,      # KL loss weight
     "gamma": 5,      # Variance penalty
-    "nSamples": 128, # Ensemble samples
+    "n_samples": 128, # Ensemble samples
     ...
 }
 ```

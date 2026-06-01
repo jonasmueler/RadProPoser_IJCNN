@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.func import vmap
 
-from common import HighResolution3DNet, ResidualMLP, blocks_dict
+from common import HighResolution3DNet
 from hrnet3D_config import MODEL_CONFIGS
 from transformer import Transformer
 

@@ -14,15 +14,15 @@ from torch.utils.data import DataLoader
 import data_loaders
 import train_loop
 from config import (
-    MODEL_REGISTRY, MODELNAME, MODELPATH, PATHRAW, SEQLEN, TRAINCONFIG,
+    MODEL_REGISTRY, MODEL_NAME, MODEL_PATH, PATH_RAW, SEQ_LEN, TRAIN_CONFIG,
 )
 
 # Load model via registry
-sys.path.append(MODELPATH)
-module_name, class_name = MODEL_REGISTRY[MODELNAME]
+sys.path.append(MODEL_PATH)
+module_name, class_name = MODEL_REGISTRY[MODEL_NAME]
 Encoder = getattr(importlib.import_module(module_name), class_name)
 
-model = Encoder().to(TRAINCONFIG["device"])
+model = Encoder().to(TRAIN_CONFIG["device"])
 
 
 def set_seed(seed: int) -> None:
@@ -55,12 +55,12 @@ print(f"Trainable parameters: {trainable_params}")
 print(f"Non-trainable parameters: {non_trainable_params}")
 
 # get data loaders
-single_frame_mode = TRAINCONFIG.get("HR_SINGLE", False)
+single_frame_mode = TRAIN_CONFIG.get("HR_SINGLE", False)
 dataset_train = data_loaders.RadarData(
-    "train", PATHRAW, PATHRAW, SEQLEN, single_frame=single_frame_mode
+    "train", PATH_RAW, PATH_RAW, SEQ_LEN, single_frame=single_frame_mode
 )
 data_train = DataLoader(
-    dataset_train, TRAINCONFIG["batchSize"], shuffle=True, num_workers=1
+    dataset_train, TRAIN_CONFIG["batch_size"], shuffle=True, num_workers=1
 )
 
 mse = torch.nn.MSELoss()
@@ -69,6 +69,6 @@ mse = torch.nn.MSELoss()
 if __name__ == "__main__":
     set_seed(42)
     train_loop.train_loop(
-        data_train, model, False, MODELNAME,
-        TRAINCONFIG, True, TRAINCONFIG["device"], mse,
+        data_train, model, False, MODEL_NAME,
+        TRAIN_CONFIG, True, TRAIN_CONFIG["device"], mse,
     )

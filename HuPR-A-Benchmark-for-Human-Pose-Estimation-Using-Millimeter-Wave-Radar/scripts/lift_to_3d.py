@@ -309,7 +309,7 @@ def load_gt_bboxes() -> Dict[int, np.ndarray]:
 
 def lift_predictions_to_3d(
     predictions_2d: Dict[int, np.ndarray],
-    device: torch.device = None,
+    device: Optional[torch.device] = None,
     no_bbox: bool = False,
     pred_bbox: bool = False,
 ) -> Dict[int, np.ndarray]:

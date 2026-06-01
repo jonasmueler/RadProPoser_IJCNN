@@ -8,7 +8,7 @@ import wandb
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from config import PATHORIGIN, TRAINCONFIG
+from config import PATH_ORIGIN, TRAIN_CONFIG
 from datasets.dataset_full import get_dataloader
 from misc import kl_loss, compute_mpjpe, nll_from_cov
 from misc.constants import NUM_DIMS
@@ -56,7 +56,7 @@ def load_checkpoint(
     Returns:
         Epoch number from checkpoint
     """
-    checkpoint = torch.load(path)
+    checkpoint = torch.load(path, weights_only=True)
     model.load_state_dict(checkpoint["model"])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint["optimizer"])
@@ -95,14 +95,14 @@ def validate(model: nn.Module, val_loader: DataLoader, device: str) -> float:
 
 def train() -> None:
     """Train RadProPoserVAECov model on HuPR full radar data."""
-    cfg = TRAINCONFIG
+    cfg = TRAIN_CONFIG
     device = cfg["device"]
 
     # Enable TF32 for faster matmul on Ampere GPUs (RTX 3090)
     torch.set_float32_matmul_precision('high')
 
     # Initialize W&B
-    if cfg["useWandb"]:
+    if cfg["use_wandb"]:
         wandb.init(
             project="RadProPoser-HuPR",
             config=cfg,
@@ -111,49 +111,49 @@ def train() -> None:
     # Data loaders
     train_loader = get_dataloader(
         phase="train",
-        batch_size=cfg["batchSize"],
-        seq_len=cfg["seqLen"],
+        batch_size=cfg["batch_size"],
+        seq_len=cfg["seq_len"],
         stride=cfg["stride"],
-        num_workers=cfg["numWorkers"],
+        num_workers=cfg["num_workers"],
     )
     val_loader = get_dataloader(
         phase="val",
-        batch_size=cfg["batchSize"],
-        seq_len=cfg["seqLen"],
+        batch_size=cfg["batch_size"],
+        seq_len=cfg["seq_len"],
         stride=cfg["stride"],
-        num_workers=cfg["numWorkers"],
+        num_workers=cfg["num_workers"],
     )
 
     print(f"Train samples: {len(train_loader.dataset)}")
     print(f"Val samples: {len(val_loader.dataset)}")
 
     # Model
-    model = RadProPoserVAECov(n_samples=cfg["nSamples"]).to(device)
+    model = RadProPoserVAECov(n_samples=cfg["n_samples"]).to(device)
     # Note: torch.compile disabled - incompatible with complex tensor operations in radar data
 
     # Optimizer
     optimizer = optim.AdamW(
         model.parameters(),
-        lr=cfg["learningRate"],
+        lr=cfg["learning_rate"],
         betas=cfg["betas"],
-        weight_decay=cfg["weightDecay"],
+        weight_decay=cfg["weight_decay"],
     )
 
     # LR scheduler
     scheduler = optim.lr_scheduler.MultiplicativeLR(
-        optimizer, lambda epoch: cfg["lrDecay"]
+        optimizer, lambda epoch: cfg["lr_decay"]
     )
 
     # Load checkpoint if resuming
     start_epoch = 0
     best_mpjpe = float("inf")
     if cfg["resume"]:
-        checkpoint_path = os.path.join(PATHORIGIN, "checkpoints", cfg["name"], "latest.pth")
+        checkpoint_path = os.path.join(PATH_ORIGIN, "checkpoints", cfg["name"], "latest.pth")
         if os.path.exists(checkpoint_path):
             start_epoch = load_checkpoint(model, optimizer, checkpoint_path) + 1
-        best_path = os.path.join(PATHORIGIN, "checkpoints", cfg["name"], "best.pth")
+        best_path = os.path.join(PATH_ORIGIN, "checkpoints", cfg["name"], "best.pth")
         if os.path.exists(best_path):
-            best_ckpt = torch.load(best_path)
+            best_ckpt = torch.load(best_path, weights_only=True)
             best_mpjpe = best_ckpt.get("mpjpe", float("inf"))
 
     # Training loop
@@ -191,7 +191,7 @@ def train() -> None:
             pbar.set_postfix(loss=f"{loss.item():.3f}", nll=f"{nll.item():.3f}", kl=f"{kl.item():.3f}")
 
             # Log batch
-            if cfg["useWandb"]:
+            if cfg["use_wandb"]:
                 wandb.log({
                     "train/loss": loss.item(),
                     "train/nll": nll.item(),
@@ -210,7 +210,7 @@ def train() -> None:
 
         print(f"Epoch {epoch} - Avg Loss: {avg_loss:.4f} Val MPJPE: {val_mpjpe:.2f} cm")
 
-        if cfg["useWandb"]:
+        if cfg["use_wandb"]:
             wandb.log({
                 "epoch": epoch,
                 "train/avg_loss": avg_loss,
@@ -221,7 +221,7 @@ def train() -> None:
             })
 
         # Save checkpoints
-        checkpoint_dir = os.path.join(PATHORIGIN, "checkpoints", cfg["name"])
+        checkpoint_dir = os.path.join(PATH_ORIGIN, "checkpoints", cfg["name"])
         save_checkpoint(model, optimizer, epoch, os.path.join(checkpoint_dir, "latest.pth"), mpjpe=val_mpjpe)
         save_checkpoint(model, optimizer, epoch, os.path.join(checkpoint_dir, f"epoch_{epoch}.pth"), mpjpe=val_mpjpe)
 
@@ -231,7 +231,7 @@ def train() -> None:
             save_checkpoint(model, optimizer, epoch, os.path.join(checkpoint_dir, "best.pth"), mpjpe=val_mpjpe)
             print(f"New best model! MPJPE: {val_mpjpe:.2f} cm")
 
-    if cfg["useWandb"]:
+    if cfg["use_wandb"]:
         wandb.finish()
 
 

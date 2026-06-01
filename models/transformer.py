@@ -1,3 +1,5 @@
+"""Transformer module for spatiotemporal feature aggregation."""
+
 from typing import Optional
 
 import torch
@@ -5,27 +7,62 @@ import torch.nn as nn
 
 
 class LearnablePositionalEncoding(nn.Module):
+    """Learnable positional encoding added to input embeddings.
+
+    Args:
+        max_seq_len: Maximum supported sequence length.
+        d_model: Model embedding dimension.
+    """
+
     def __init__(self, max_seq_len: int, d_model: int) -> None:
         super().__init__()
         self.max_seq_len = max_seq_len
         self.pos_embedding = nn.Parameter(torch.ones(1, max_seq_len, d_model))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Add positional encoding to input tensor.
+
+        Args:
+            x: Input tensor of shape (B, seq_len, d_model).
+
+        Returns:
+            Tensor with positional encoding added.
+        """
         return x + self.pos_embedding
 
 
 class TransformerBlock(nn.Module):
+    """Single transformer block with self-attention and feedforward network.
+
+    Args:
+        d_model: Model embedding dimension.
+        num_heads: Number of attention heads.
+        d_ff: Feedforward network hidden dimension.
+        dropout: Dropout rate.
+    """
+
     def __init__(self, d_model: int, num_heads: int, d_ff: int, dropout: float = 0.1) -> None:
         super().__init__()
-        self.attn = nn.MultiheadAttention(embed_dim=d_model, num_heads=num_heads, batch_first=True)
+        self.attn = nn.MultiheadAttention(
+            embed_dim=d_model, num_heads=num_heads, batch_first=True
+        )
         self.ffn = nn.Sequential(
             nn.Linear(d_model, d_ff),
             nn.ReLU(),
-            nn.Linear(d_ff, d_model)
+            nn.Linear(d_ff, d_model),
         )
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Apply self-attention and feedforward with residual connections.
+
+        Args:
+            x: Input tensor of shape (B, seq_len, d_model).
+            mask: Optional attention mask.
+
+        Returns:
+            Output tensor of same shape as input.
+        """
         attn_output, _ = self.attn(x, x, x, attn_mask=mask)
         x = x + self.dropout(attn_output)
 
@@ -36,11 +73,28 @@ class TransformerBlock(nn.Module):
 
 
 class Transformer(nn.Module):
-    """Spatial-temporal transformer for aggregating radar pose features across sequence elements."""
+    """Spatial-temporal transformer for aggregating radar pose features across sequence elements.
 
-    def __init__(self, input_dim: int = 128, seq_len: int = 16, d_model: int = 256,
-                 num_heads: int = 8, d_ff: int = 512, num_layers: int = 1,
-                 dropout: float = 0.1) -> None:
+    Args:
+        input_dim: Dimension of input features.
+        seq_len: Maximum sequence length for positional encoding.
+        d_model: Internal model dimension.
+        num_heads: Number of attention heads.
+        d_ff: Feedforward network hidden dimension.
+        num_layers: Number of transformer blocks.
+        dropout: Dropout rate.
+    """
+
+    def __init__(
+        self,
+        input_dim: int = 128,
+        seq_len: int = 16,
+        d_model: int = 256,
+        num_heads: int = 8,
+        d_ff: int = 512,
+        num_layers: int = 1,
+        dropout: float = 0.1,
+    ) -> None:
         super().__init__()
         self.embedding = nn.Linear(input_dim, d_model)
         self.positional_encoding = LearnablePositionalEncoding(seq_len, d_model)
@@ -52,6 +106,15 @@ class Transformer(nn.Module):
         self.output_layer = nn.Linear(d_model, input_dim)
 
     def forward(self, x: torch.Tensor, mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Forward pass through the transformer.
+
+        Args:
+            x: Input tensor of shape (B, seq_len, input_dim).
+            mask: Optional attention mask.
+
+        Returns:
+            Output tensor of shape (B, seq_len, input_dim).
+        """
         x = self.embedding(x)
         x = self.positional_encoding(x)
 
@@ -69,4 +132,4 @@ if __name__ == "__main__":
     model = Transformer(input_dim, seq_len)
     x = torch.randn(batch_size, seq_len, input_dim)
     output = model(x)
-    print(output.shape)  # Expected output: (batch_size, seq_len, input_dim)
+    print(output.shape)

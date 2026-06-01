@@ -3,7 +3,7 @@ import os
 import torch
 from tqdm import tqdm
 
-from config import PATHORIGIN, TESTCONFIG
+from config import PATH_ORIGIN, TEST_CONFIG
 from datasets.dataset_full import get_dataloader
 from misc.constants import NUM_DIMS
 from misc import (
@@ -18,13 +18,13 @@ from misc import (
 from models import RadProPoserVAECov
 
 CHECKPOINT_PATH = os.path.join(
-    PATHORIGIN, "checkpoints", TESTCONFIG["checkpoint_name"], "best.pth"
+    PATH_ORIGIN, "checkpoints", TEST_CONFIG["checkpoint_name"], "best.pth"
 )
-DEVICE = TESTCONFIG["device"]
-BATCH_SIZE = TESTCONFIG["batch_size"]
-SEQ_LEN = TESTCONFIG["seq_len"]
-NUM_WORKERS = TESTCONFIG["num_workers"]
-N_SAMPLES = TESTCONFIG["n_samples"]
+DEVICE = TEST_CONFIG["device"]
+BATCH_SIZE = TEST_CONFIG["batch_size"]
+SEQ_LEN = TEST_CONFIG["seq_len"]
+NUM_WORKERS = TEST_CONFIG["num_workers"]
+N_SAMPLES = TEST_CONFIG["n_samples"]
 
 
 def test() -> None:
@@ -32,7 +32,7 @@ def test() -> None:
     print(f"Loading checkpoint: {CHECKPOINT_PATH}")
 
     if not os.path.exists(CHECKPOINT_PATH):
-        latest_path = os.path.join(PATHORIGIN, "checkpoints", TESTCONFIG["checkpoint_name"], "latest.pth")
+        latest_path = os.path.join(PATH_ORIGIN, "checkpoints", TEST_CONFIG["checkpoint_name"], "latest.pth")
         if os.path.exists(latest_path):
             print(f"Best checkpoint not found, using latest: {latest_path}")
             checkpoint_path = latest_path
@@ -51,7 +51,7 @@ def test() -> None:
     print(f"Test samples: {len(test_loader.dataset)}")
 
     model = RadProPoserVAECov(n_samples=N_SAMPLES).to(DEVICE)
-    checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
+    checkpoint = torch.load(checkpoint_path, map_location=DEVICE, weights_only=True)
     model.load_state_dict(checkpoint["model"])
     model.eval()
 

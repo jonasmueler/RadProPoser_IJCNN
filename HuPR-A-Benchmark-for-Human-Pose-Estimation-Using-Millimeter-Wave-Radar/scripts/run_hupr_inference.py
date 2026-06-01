@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -34,6 +34,7 @@ class ConfigObj:
     """Simple config object to mimic YAML config structure."""
 
     def __init__(self) -> None:
+        """Initialize config object with HuPR inference parameters."""
         self.DATASET = type("DATASET", (), {
             "numFrames": NUM_FRAMES,
             "numGroupFrames": NUM_GROUP_FRAMES,
@@ -52,6 +53,14 @@ class Normalize:
     """Normalize radar data per-channel."""
 
     def __call__(self, radar_data: torch.Tensor) -> torch.Tensor:
+        """Normalize radar data per-channel to zero mean and unit variance.
+
+        Args:
+            radar_data: Radar tensor of shape (C, H, W).
+
+        Returns:
+            Normalized tensor of same shape.
+        """
         c = radar_data.size(0)
         min_values = torch.min(radar_data.view(c, -1), 1)[0].view(c, 1, 1)
         radar_zero = radar_data - min_values
@@ -179,7 +188,7 @@ def heatmap_to_keypoints(heatmaps: torch.Tensor) -> np.ndarray:
     return keypoints.cpu().numpy()
 
 
-def run_hupr_inference(device: torch.device = None, batch_size: int = 32) -> Dict[int, np.ndarray]:
+def run_hupr_inference(device: Optional[torch.device] = None, batch_size: int = 32) -> Dict[int, np.ndarray]:
     """Run HuPR model on all test sequences with batching.
 
     Args:

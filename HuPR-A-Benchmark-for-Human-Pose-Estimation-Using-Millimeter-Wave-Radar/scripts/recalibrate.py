@@ -9,7 +9,7 @@ from tqdm import tqdm
 SCRIPT_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 
-from config import PATHORIGIN, TRAINCONFIG
+from config import PATH_ORIGIN, TRAIN_CONFIG
 from datasets.dataset_full import get_dataloader
 from misc.constants import NUM_DIMS
 from models import RadProPoserVAECov
@@ -75,7 +75,7 @@ def load_predictions(gt_source: str, phase: str) -> Optional[Tuple[np.ndarray, n
 
 
 def get_checkpoint_path() -> Path:
-    """Get checkpoint path from TESTCONFIG.
+    """Get checkpoint path from TEST_CONFIG.
 
     Returns:
         Path to the best checkpoint file
@@ -83,11 +83,11 @@ def get_checkpoint_path() -> Path:
     Raises:
         FileNotFoundError: If no checkpoint exists
     """
-    from config import TESTCONFIG
-    checkpoint_name = TESTCONFIG["checkpoint_name"]
+    from config import TEST_CONFIG
+    checkpoint_name = TEST_CONFIG["checkpoint_name"]
 
-    best_path = Path(PATHORIGIN) / "checkpoints" / checkpoint_name / "best.pth"
-    latest_path = Path(PATHORIGIN) / "checkpoints" / checkpoint_name / "latest.pth"
+    best_path = Path(PATH_ORIGIN) / "checkpoints" / checkpoint_name / "best.pth"
+    latest_path = Path(PATH_ORIGIN) / "checkpoints" / checkpoint_name / "latest.pth"
 
     if best_path.exists():
         return best_path
@@ -192,8 +192,17 @@ def format_sharpness_table(results: Dict[str, Any], gt_source: str) -> None:
     cal_per_joint = results["sharpness_isotonic_per_joint"]
 
     # Compute grouped averages
-    def compute_grouped(per_joint_array: np.ndarray, total_key: str) -> dict:
-        grouped = {}
+    def compute_grouped(per_joint_array: np.ndarray, total_key: str) -> Dict[str, float]:
+        """Compute averaged sharpness values for joint groups.
+
+        Args:
+            per_joint_array: Per-joint sharpness array of shape (17,).
+            total_key: Key to retrieve total sharpness from results dict.
+
+        Returns:
+            Dictionary mapping group name to averaged sharpness value.
+        """
+        grouped: Dict[str, float] = {}
         for group_name, indices in joint_groups.items():
             grouped[group_name] = np.mean([per_joint_array[i] for i in indices])
         grouped["Total"] = results[total_key]
@@ -238,7 +247,7 @@ def main() -> None:
         print(f"Loading checkpoint: {checkpoint_path}")
 
         model = RadProPoserVAECov(n_samples=N_SAMPLES).to(DEVICE)
-        checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
+        checkpoint = torch.load(checkpoint_path, map_location=DEVICE, weights_only=True)
         model.load_state_dict(checkpoint["model"])
         model.eval()
 

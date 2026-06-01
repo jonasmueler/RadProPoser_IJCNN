@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from common import HighResolution3DNet, blocks_dict
+from common import HighResolution3DNet
 from hrnet3D_config_4D import MODEL_CONFIGS as cfg_4D
 
 sys.path.append(str(Path(__file__).parent.parent))

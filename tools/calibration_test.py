@@ -9,7 +9,7 @@ import numpy as np
 
 from calibration_analysis import MultiModelRecalibrationVisualizer as ParametricVisualizer
 from calibration_analysis_empirical import MultiModelRecalibrationVisualizer as EmpiricalVisualizer
-from config import MODELNAME, NUM_DIMS
+from config import MODEL_NAME, NUM_DIMS
 
 MODELS = {
     "rppgaussiangaussian": {"type": "parametric", "laplace": False},
@@ -54,17 +54,17 @@ def load_data(model_suffix: str):
     
     return mu_val, var_val, gt_val, ensemble_val, mu_test, var_test, gt_test, ensemble_test
 
-def main():
+def main() -> None:
     """Run recalibration analysis for the model specified in config."""
-    if MODELNAME is None:
-        print("ERROR: MODELNAME not set in config.py")
+    if MODEL_NAME is None:
+        print("ERROR: MODEL_NAME not set in config.py")
         return
     
-    model_suffix = MODELNAME.lower()
+    model_suffix = MODEL_NAME.lower()
     config = MODELS.get(model_suffix)
     
     if config is None:
-        print(f"ERROR: Unknown model {MODELNAME}")
+        print(f"ERROR: Unknown model {MODEL_NAME}")
         return
     
     mu_val, var_val, gt_val, ensemble_val, mu_test, var_test, gt_test, ensemble_test = load_data(model_suffix)
@@ -79,7 +79,7 @@ def main():
         )
     else:
         if ensemble_val is None or ensemble_test is None:
-            print(f"ERROR: Missing ensemble data for {MODELNAME}")
+            print(f"ERROR: Missing ensemble data for {MODEL_NAME}")
             return
         visualizer = EmpiricalVisualizer(num_dims=NUM_DIMS)
         visualizer.quantify_improvement_with_holdout(

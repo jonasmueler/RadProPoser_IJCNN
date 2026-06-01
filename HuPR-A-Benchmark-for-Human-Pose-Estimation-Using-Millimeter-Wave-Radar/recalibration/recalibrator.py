@@ -1,6 +1,6 @@
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import joblib
 import matplotlib.pyplot as plt
@@ -178,6 +178,12 @@ class HuPRRecalibrator:
         fig, ax = plt.subplots(figsize=(10, 10))
 
         def plot_cdf(cdf_vals: np.ndarray, label: str) -> None:
+            """Plot a single calibration curve on the axes.
+
+            Args:
+                cdf_vals: CDF values of shape (N, D).
+                label: Legend label for this curve.
+            """
             flat = cdf_vals.flatten()
             observed_p = [(flat <= q).mean() for q in expected_p]
             ax.plot(expected_p, observed_p, label=label, linewidth=2)
@@ -244,7 +250,7 @@ class HuPRRecalibrator:
         var_test: np.ndarray,
         gt_test: np.ndarray,
         model_name: str,
-    ) -> Dict[str, float]:
+    ) -> Dict[str, Any]:
         """Fit on train set, evaluate on test set, and save models.
 
         Args:
@@ -257,7 +263,7 @@ class HuPRRecalibrator:
             model_name: Name for saving the model (e.g., "motionbert")
 
         Returns:
-            Dictionary with uncalibrated and calibrated ECE values
+            Dictionary with ECE values (float) and per-joint sharpness arrays (np.ndarray).
         """
         self._fit_models(mu_train, var_train, gt_train)
         self.save_models("recalibration_models", model_name)

@@ -6,7 +6,7 @@ import torch.optim as optim
 import wandb
 from edl_pytorch import evidential_regression
 
-from config import MODELNAME, NUM_COORDS, NUM_JOINTS, PATHORIGIN, TRAINCONFIG
+from config import MODEL_NAME, NUM_COORDS, NUM_JOINTS, PATH_ORIGIN, TRAIN_CONFIG
 from losses import kl_loss, laplace_nll, nll_from_cov, nll_loss
 
 
@@ -18,9 +18,9 @@ def save_checkpoint(
     Args:
         model: The model whose state needs to be saved.
         optimizer: The optimizer whose state needs to be saved.
-        filename: File path relative to PATHORIGIN.
+        filename: File path relative to PATH_ORIGIN.
     """
-    filepath = os.path.join(PATHORIGIN, filename)
+    filepath = os.path.join(PATH_ORIGIN, filename)
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
 
     checkpoint = {
@@ -44,7 +44,7 @@ def load_checkpoint(
     Returns:
         The model if optimizer is None, otherwise [model, optimizer].
     """
-    checkpoint = torch.load(path)
+    checkpoint = torch.load(path, weights_only=True)
     model.load_state_dict(checkpoint["model"])
     if optimizer is not None:
         optimizer.load_state_dict(checkpoint["optimizer"])
@@ -63,7 +63,7 @@ def lr_lambda(epoch: int) -> float:
     Returns:
         Learning rate decay multiplier.
     """
-    return TRAINCONFIG["lrDecay"]
+    return TRAIN_CONFIG["lr_decay"]
 
 
 def train_loop(
@@ -83,10 +83,10 @@ def train_loop(
         model: The neural network model to be trained.
         load_model: Whether to load a previously saved model checkpoint.
         model_name: The name of the model used for saving checkpoints and logging.
-        params: Training parameters (optimizer, learningRate, betas, weightDecay, epochs).
+        params: Training parameters (optimizer, learning_rate, betas, weight_decay, epochs).
         use_wandb: Whether to use Weights & Biases for logging.
         device: Device to use for training (e.g., "cpu" or "cuda").
-        criterion: Loss function to use when TRAINCONFIG["nll"] is False.
+        criterion: Loss function to use when TRAIN_CONFIG["nll"] is False.
     """
 
     if use_wandb:
@@ -96,23 +96,24 @@ def train_loop(
     if params["optimizer"] == "adam":
         optimizer = torch.optim.AdamW(
             model.parameters(),
-            lr=params["learningRate"],
+            lr=params["learning_rate"],
             betas=params["betas"],
-            weight_decay=params["weightDecay"],
+            weight_decay=params["weight_decay"],
         )
-    if params["optimizer"] == "RMSProp":
+    elif params["optimizer"] == "RMSProp":
         optimizer = torch.optim.RMSprop(
             model.parameters(),
-            lr=params["learningRate"],
-            betas=params["betas"],
-            weight_decay=params["weightDecay"],
+            lr=params["learning_rate"],
+            weight_decay=params["weight_decay"],
         )
+    else:
+        raise ValueError(f"Unknown optimizer: {params['optimizer']}")
 
     # load model and optimizer from checkpoint
     if load_model:
-        os.chdir(os.path.join(PATHORIGIN, "models"))
+        os.chdir(os.path.join(PATH_ORIGIN, "models"))
         checkpoint_path = os.path.join(
-            PATHORIGIN, "trainedModels", model_name, model_name
+            PATH_ORIGIN, "trainedModels", model_name, model_name
         )
         last_state = load_checkpoint(model, optimizer, checkpoint_path)
         model = last_state[0]
@@ -130,38 +131,38 @@ def train_loop(
 
             optimizer.zero_grad()
 
-            if TRAINCONFIG["nll"]:
+            if TRAIN_CONFIG["nll"]:
                 preds, mu, latent_spread, mu_out, var_out = model.forward(radar)
 
-                if MODELNAME == "RPPgaussianGaussian":
+                if MODEL_NAME == "RPPgaussianGaussian":
                     kl = kl_loss(mu, latent_spread)
                     nll, pen = nll_loss(gt, mu_out, var_out)
-                elif MODELNAME == "RPPgaussianGaussianCov":
+                elif MODEL_NAME == "RPPgaussianGaussianCov":
                     kl = kl_loss(mu, latent_spread)
                     nll, pen = nll_from_cov(gt, mu_out, var_out)
-                elif MODELNAME == "RPPlaplaceGaussian":
+                elif MODEL_NAME == "RPPlaplaceGaussian":
                     nll, pen = nll_loss(gt, mu_out, var_out)
-                    kl = torch.zeros_like(nll).to(TRAINCONFIG["device"])
-                elif MODELNAME == "RPPgaussianLaplace":
+                    kl = torch.zeros_like(nll).to(device)
+                elif MODEL_NAME == "RPPgaussianLaplace":
                     nll, pen = laplace_nll(gt, mu_out, var_out)
                     kl = kl_loss(mu, latent_spread)
-                elif MODELNAME == "RPPlaplaceLaplace":
+                elif MODEL_NAME == "RPPlaplaceLaplace":
                     nll, pen = laplace_nll(gt, mu_out, var_out)
-                    kl = torch.zeros_like(nll).to(TRAINCONFIG["device"])
+                    kl = torch.zeros_like(nll).to(device)
 
-                loss = nll + TRAINCONFIG["beta"] * kl
+                loss = nll + TRAIN_CONFIG["beta"] * kl
 
-            elif TRAINCONFIG["nf"]:
+            elif TRAIN_CONFIG["nf"]:
                 mu, kld = model.forward(radar, inference=False)
-                loss = criterion(mu, gt) + TRAINCONFIG["beta"] * kld
+                loss = criterion(mu, gt) + TRAIN_CONFIG["beta"] * kld
 
-            elif TRAINCONFIG["evd"]:
+            elif TRAIN_CONFIG["evd"]:
                 pred_nig, _ = model(radar)
                 loss = evidential_regression(
-                    pred_nig, gt, lamb=TRAINCONFIG["lambda"]
+                    pred_nig, gt, lamb=TRAIN_CONFIG["lambda"]
                 )
 
-            elif TRAINCONFIG.get("HR_SINGLE"):
+            elif TRAIN_CONFIG.get("HR_SINGLE"):
                 root, offsets = model.forward(radar)
                 gt = gt.reshape(gt.shape[0], NUM_JOINTS, NUM_COORDS)
                 loss_root = criterion(root, gt[:, 0])
@@ -179,21 +180,21 @@ def train_loop(
             train_counter += 1
 
             # logging
-            if TRAINCONFIG["nll"]:
+            if TRAIN_CONFIG["nll"]:
                 if use_wandb:
                     wandb.log({
                         "nll": nll.detach().cpu().item(),
-                        "KLLoss": kl.detach().cpu().item(),
+                        "kl_loss": kl.detach().cpu().item(),
                         "loss": loss.detach().cpu().item(),
-                        "varPenalty": pen.detach().cpu().item(),
+                        "var_penalty": pen.detach().cpu().item(),
                     })
-            elif TRAINCONFIG["nf"]:
+            elif TRAIN_CONFIG["nf"]:
                 if use_wandb:
                     wandb.log({
                         "loss": loss.detach().cpu().item(),
-                        "KL": kld.detach().cpu().item(),
+                        "kl": kld.detach().cpu().item(),
                     })
-            elif TRAINCONFIG["evd"]:
+            elif TRAIN_CONFIG["evd"]:
                 if use_wandb:
                     wandb.log({
                         "evidential_loss": loss.detach().cpu().item(),
@@ -201,12 +202,12 @@ def train_loop(
                         "alpha": pred_nig[2].mean(),
                         "beta": pred_nig[3].mean(),
                     })
-            elif TRAINCONFIG.get("HR_SINGLE"):
+            elif TRAIN_CONFIG.get("HR_SINGLE"):
                 if use_wandb:
-                    wandb.log({"MSE": loss.detach().cpu().item()})
+                    wandb.log({"mse": loss.detach().cpu().item()})
             else:
                 if use_wandb:
-                    wandb.log({"MSE": loss.detach().cpu().item()})
+                    wandb.log({"mse": loss.detach().cpu().item()})
 
         scheduler.step()
 

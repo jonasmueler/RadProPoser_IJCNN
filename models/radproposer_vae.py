@@ -8,12 +8,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Laplace
 
-from common import HighResolution3DNet, ResidualMLP, blocks_dict
+from common import HighResolution3DNet
 from hrnet3D_config import MODEL_CONFIGS
 from transformer import Transformer
 
 sys.path.append(str(Path(__file__).parent.parent))
-from tools.config import MODELNAME, NUM_DIMS
+from tools.config import MODEL_NAME, NUM_DIMS
 
 
 class RadProPoserVAE(nn.Module):
@@ -48,9 +48,9 @@ class RadProPoserVAE(nn.Module):
         self.n_samples = 500
 
         # specify latent distribution
-        if MODELNAME in ["RPPgaussianGaussian", "RPPgaussianLaplace"]:
+        if MODEL_NAME in ["RPPgaussianGaussian", "RPPgaussianLaplace"]:
             self.latent_dist = "gaussian"
-        elif MODELNAME in ["RPPlaplaceLaplace", "RPPlaplaceGaussian"]:
+        elif MODEL_NAME in ["RPPlaplaceLaplace", "RPPlaplaceGaussian"]:
             self.latent_dist = "laplace"
         else:
             warnings.warn(

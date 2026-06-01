@@ -153,7 +153,7 @@ def process_frame(
     return output.numpy()
 
 
-def process_sequence_worker(args) -> Tuple[int, bool]:
+def process_sequence_worker(args: Tuple[int, str]) -> Tuple[int, bool]:
     """Worker function for parallel processing.
 
     Args:

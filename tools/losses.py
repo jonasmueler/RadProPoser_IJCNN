@@ -5,7 +5,7 @@ from typing import Tuple
 import numpy as np
 import torch
 
-from config import TRAINCONFIG
+from config import TRAIN_CONFIG
 
 
 def kl_loss(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
@@ -35,7 +35,7 @@ def nll_loss(
         Tuple of (NLL loss, variance penalty), both scalars.
     """
     var = torch.clamp(var, min=1e-6)
-    pen = TRAINCONFIG["gamma"] * var.mean()
+    pen = TRAIN_CONFIG["gamma"] * var.mean()
     loss = ((gt - mu) ** 2 / var).mean() + pen
     return loss, pen
 
@@ -67,7 +67,7 @@ def nll_from_cov(
 
     nll = 0.5 * (maha + logdet + K * np.log(2.0 * np.pi))
 
-    pen = TRAINCONFIG["gamma"] * cov.diagonal(dim1=-2, dim2=-1).mean(dim=-1)
+    pen = TRAIN_CONFIG["gamma"] * cov.diagonal(dim1=-2, dim2=-1).mean(dim=-1)
 
     return nll.mean() + pen.mean(), pen.mean()
 
@@ -89,7 +89,7 @@ def nll_loss_precision(
     precision = 1.0 / variance
     log_precision = torch.log(precision)
 
-    pen = -(TRAINCONFIG["gamma"] * log_precision.mean())
+    pen = -(TRAIN_CONFIG["gamma"] * log_precision.mean())
     nll = (pen + precision * (gt - mu) ** 2).mean()
     return nll, pen
 
@@ -109,6 +109,6 @@ def laplace_nll(
     """
     b = torch.sqrt(torch.clamp(var_pred, min=1e-10) / 2.0)
     abs_error = torch.abs(y_true - mu_pred)
-    pen = TRAINCONFIG["gamma"] * b
+    pen = TRAIN_CONFIG["gamma"] * b
     loss = pen + abs_error / b
     return loss.mean(), pen.mean()

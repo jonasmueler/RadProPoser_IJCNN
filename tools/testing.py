@@ -12,22 +12,21 @@ from tqdm import tqdm
 
 import train_loop
 from config import (
-    MODEL_REGISTRY, MODELNAME, MODELPATH, NUM_COORDS, NUM_DIMS, NUM_JOINTS,
-    PATHORIGIN, PATHRAW, SEQLEN, TRAINCONFIG,
+    MODEL_REGISTRY, MODEL_NAME, MODEL_PATH, NUM_COORDS, NUM_DIMS, NUM_JOINTS,
+    PATH_ORIGIN, PATH_RAW, SEQ_LEN, TRAIN_CONFIG,
 )
 
 def get_model_checkpoint_path(model_name: str, testing_epoch: int = None) -> str:
-    """
-    Get the path to the model checkpoint for testing.
-    
+    """Get the path to the model checkpoint for testing.
+
     Args:
-        model_name: Name of the model (e.g., "RPPgaussianGaussianCov")
-        testing_epoch: Specific epoch number to use, or None to use the latest checkpoint
-    
+        model_name: Name of the model (e.g., "RPPgaussianGaussianCov").
+        testing_epoch: Specific epoch number to use, or None to use the latest.
+
     Returns:
-        Full path to the checkpoint file
+        Full path to the checkpoint file.
     """
-    model_dir = os.path.join(PATHORIGIN, "trainedModels", model_name)
+    model_dir = os.path.join(PATH_ORIGIN, "trainedModels", model_name)
     
     if testing_epoch is not None:
         # Use specified epoch
@@ -73,15 +72,40 @@ def get_model_checkpoint_path(model_name: str, testing_epoch: int = None) -> str
 class RadarPoseTester:
     """Evaluation pipeline for radar-based pose estimation models."""
 
-    def __init__(self, root_path: str, seq_len: int = SEQLEN, device: str = TRAINCONFIG["device"], single_frame: bool = False) -> None:
+    def __init__(
+        self,
+        root_path: str,
+        seq_len: int = SEQ_LEN,
+        device: str = TRAIN_CONFIG["device"],
+        single_frame: bool = False,
+    ) -> None:
+        """Initialize the radar pose tester.
+
+        Args:
+            root_path: Root path to the raw radar and skeleton data.
+            seq_len: Temporal sequence length for model input.
+            device: Device for model inference (e.g., "cuda" or "cpu").
+            single_frame: If True, evaluate in single-frame mode.
+        """
         self.root_path = root_path
         self.seq_len = seq_len
         self.device = device
         self.single_frame = single_frame
 
     @staticmethod
-    def compute_mpjpe(preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False):
-        """Compute Mean Per Joint Position Error (MPJPE) between predictions and targets."""
+    def compute_mpjpe(
+        preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute Mean Per Joint Position Error (MPJPE) between predictions and targets.
+
+        Args:
+            preds: Predicted poses of shape (B, NUM_DIMS).
+            targets: Ground truth poses of shape (B, NUM_DIMS).
+            keypoints: If True, return per-keypoint errors instead of scalar.
+
+        Returns:
+            Tuple of (mean_error, std_error).
+        """
         preds = preds.view(preds.size(0), NUM_JOINTS, NUM_COORDS)
         targets = targets.view(targets.size(0), NUM_JOINTS, NUM_COORDS)
 
@@ -92,8 +116,19 @@ class RadarPoseTester:
             return dist.mean(dim=0), dist.std(dim=0)
         return dist.mean(), dist.std()
     
-    def compute_p_mpjpe(self, preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False):
-        """Compute Procrustes-aligned MPJPE (P-MPJPE) after rigid alignment."""
+    def compute_p_mpjpe(
+        self, preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute Procrustes-aligned MPJPE (P-MPJPE) after rigid alignment.
+
+        Args:
+            preds: Predicted poses of shape (B, NUM_DIMS).
+            targets: Ground truth poses of shape (B, NUM_DIMS).
+            keypoints: If True, return per-keypoint errors instead of scalar.
+
+        Returns:
+            Tuple of (mean_error, std_error).
+        """
         preds = preds.view(preds.size(0), NUM_JOINTS, NUM_COORDS)
         targets = targets.view(targets.size(0), NUM_JOINTS, NUM_COORDS)
 
@@ -108,12 +143,24 @@ class RadarPoseTester:
             return dist.mean(dim=0), dist.std(dim=0)
         return dist.mean(), dist.std()
     
-    def procrustes_torch(self,
-                         X: torch.Tensor,
-                         Y: torch.Tensor,
-                         scaling: bool = True,
-                         reflection: str = 'best'):
-        """Align Y to X using Procrustes analysis (rotation, scaling, translation)."""
+    def procrustes_torch(
+        self,
+        X: torch.Tensor,
+        Y: torch.Tensor,
+        scaling: bool = True,
+        reflection: str = "best",
+    ) -> torch.Tensor:
+        """Align Y to X using Procrustes analysis (rotation, scaling, translation).
+
+        Args:
+            X: Reference shape of shape (J, 3).
+            Y: Shape to be aligned of shape (J, 3).
+            scaling: If True, apply uniform scaling.
+            reflection: How to handle reflections ("best" picks lower error).
+
+        Returns:
+            Aligned version of Y with same shape as X.
+        """
         muX = X.mean(dim=0, keepdim=True)
         muY = Y.mean(dim=0, keepdim=True)
 
@@ -152,8 +199,17 @@ class RadarPoseTester:
 
         return Z
 
-    def load_sequence(self, combination: list[str]):
-        """Load radar and skeleton data for a given participant/angle/action/rep combination."""
+    def load_sequence(
+        self, combination: list[str]
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+        """Load radar and skeleton data for a given participant/angle/action/rep combination.
+
+        Args:
+            combination: List of [participant, angle, action, rep] strings.
+
+        Returns:
+            Tuple of (radar_tensor, skeleton_tensor), or (None, None) if files missing.
+        """
         radar_path = os.path.join(self.root_path, "radar", f"data_cube_parsed_{'_'.join(combination)}.npz")
         skeleton_path = os.path.join(self.root_path, "skeletons", f"skeleton_{'_'.join(combination)}.npy")
 
@@ -168,8 +224,22 @@ class RadarPoseTester:
 
         return radar_tensor, skeleton_tensor
 
-    def predict_sequence(self, combination: list[str], keypoints: bool = False, return_preds: bool = False):
-        """Run model inference on a single sequence and compute P-MPJPE."""
+    def predict_sequence(
+        self,
+        combination: list[str],
+        keypoints: bool = False,
+        return_preds: bool = False,
+    ) -> tuple:
+        """Run model inference on a single sequence and compute P-MPJPE.
+
+        Args:
+            combination: List of [participant, angle, action, rep] strings.
+            keypoints: If True, return per-keypoint errors.
+            return_preds: Unused, kept for API compatibility.
+
+        Returns:
+            Tuple of (error, std, preds, vars, gts, ensembles), or (None,)*6 if missing.
+        """
         radar, target = self.load_sequence(combination)
         if radar is None or target is None:
             return (None,) * 6
@@ -194,18 +264,18 @@ class RadarPoseTester:
                     end = min(i + batch_size, radar.size(0) - self.seq_len)
                     batch = torch.stack([radar[j:j+self.seq_len] for j in range(i, end)])
                 
-                if MODELNAME in ("RPPgaussianGaussian", "RPPlaplaceLaplace", "RPPlaplaceGaussian", "RPPgaussianLaplace"):
+                if MODEL_NAME in ("RPPgaussianGaussian", "RPPlaplaceLaplace", "RPPlaplaceGaussian", "RPPgaussianLaplace"):
                     ensemble, _, _, mu, var = self.model(batch, return_samples=True)
-                elif MODELNAME == "RPPgaussianGaussianCov":
+                elif MODEL_NAME == "RPPgaussianGaussianCov":
                     ensemble, _, _, mu, cov = self.model(batch, return_samples=True)
                     var = cov.diagonal(dim1=-2, dim2=-1)
-                elif MODELNAME == "RPPnormalizingFlow":
+                elif MODEL_NAME == "RPPnormalizingFlow":
                     mu, var, ensemble = self.model(batch, inference=True)
-                elif MODELNAME == "RPPevidential":
+                elif MODEL_NAME == "RPPevidential":
                     out_uncertainty, ensemble = self.model(batch)
                     mu = out_uncertainty[0]
                     var = torch.var(ensemble, dim=-1)
-                elif MODELNAME == "HoEtAlBaseline":
+                elif MODEL_NAME == "HoEtAlBaseline":
                     root, offsets = self.model(batch)
                     mu = root.unsqueeze(dim=1) + offsets
                     mu = torch.cat([root.unsqueeze(dim=1), mu], dim=1)
@@ -237,8 +307,18 @@ class RadarPoseTester:
         print(error)
         return error, std, preds, vars, gts, ensembles
 
-    def evaluate(self, test_set: list[list[str]], keypoints: bool = False):
-        """Evaluate model across multiple sequences and aggregate predictions."""
+    def evaluate(
+        self, test_set: list[list[str]], keypoints: bool = False
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None]:
+        """Evaluate model across multiple sequences and aggregate predictions.
+
+        Args:
+            test_set: List of [participant, angle, action, rep] combinations.
+            keypoints: If True, return per-keypoint errors.
+
+        Returns:
+            Tuple of (error, std, preds, vars, gts, ensembles).
+        """
         losses, stds, preds, vars, gts, ensembles = [], [], [], [], [], []
 
         for comb in test_set:
@@ -289,7 +369,7 @@ class RadarPoseTester:
                     end = min(i + batch_size, total)
                     batch_frames = radar[i:end].to(self.device)
 
-                    if MODELNAME == "HoEtAlBaseline":
+                    if MODEL_NAME == "HoEtAlBaseline":
                         root, offset = self.model(batch_frames)
                         preds = root.unsqueeze(dim=1) + offset
                         preds = torch.cat([root.unsqueeze(dim=1), preds], dim=1)
@@ -321,11 +401,29 @@ class RadarPoseTester:
 
         return error, std, preds, vars, gts
 
-    def run_evaluation(self, parts: list, angles: list, actions: list, reps: list, model_path: str):
-        """Run full evaluation: load model, evaluate all combinations, save predictions and calibration data."""
-        sys.path.append(MODELPATH)
+    def run_evaluation(
+        self,
+        parts: list[str],
+        angles: list[str],
+        actions: list[str],
+        reps: list[str],
+        model_path: str,
+    ) -> dict:
+        """Run full evaluation: load model, evaluate all combinations, save predictions.
 
-        module_name, class_name = MODEL_REGISTRY[MODELNAME]
+        Args:
+            parts: List of participant IDs (e.g., ["p1", "p2", "p12"]).
+            angles: List of angle IDs (e.g., ["an0", "an1", "an2"]).
+            actions: List of action IDs (e.g., ["ac1", ..., "ac9"]).
+            reps: List of repetition IDs (e.g., ["r0", "r1"]).
+            model_path: Path to the model checkpoint file.
+
+        Returns:
+            Dict mapping participant -> angle -> {"error": float, "std": float}.
+        """
+        sys.path.append(MODEL_PATH)
+
+        module_name, class_name = MODEL_REGISTRY[MODEL_NAME]
         Encoder = getattr(importlib.import_module(module_name), class_name)
 
         self.model = Encoder().to(self.device)
@@ -379,7 +477,7 @@ class RadarPoseTester:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         calib_dir = os.path.join(base_dir, "calibration_analysis")
         os.makedirs(calib_dir, exist_ok=True)
-        model_suffix = MODELNAME.lower() if MODELNAME else "default"
+        model_suffix = MODEL_NAME.lower() if MODEL_NAME else "default"
 
         if val_preds:
             np.save(os.path.join(calib_dir, f"mu_validation_{model_suffix}.npy"), np.concatenate(val_preds, axis=0))
@@ -398,12 +496,12 @@ class RadarPoseTester:
         return results_by_participant
 
 if __name__ == "__main__":
-    single_frame_mode = TRAINCONFIG.get("HR_SINGLE", False)
-    tester = RadarPoseTester(root_path=PATHRAW, single_frame=single_frame_mode)
+    single_frame_mode = TRAIN_CONFIG.get("HR_SINGLE", False)
+    tester = RadarPoseTester(root_path=PATH_RAW, single_frame=single_frame_mode)
 
     # Get checkpoint path based on testing_epoch setting
-    testing_epoch = TRAINCONFIG.get("testing_epoch", None)
-    model_path = get_model_checkpoint_path(MODELNAME, testing_epoch)
+    testing_epoch = TRAIN_CONFIG.get("testing_epoch", None)
+    model_path = get_model_checkpoint_path(MODEL_NAME, testing_epoch)
 
     res = tester.run_evaluation(
         parts=["p1", "p2", "p12"],

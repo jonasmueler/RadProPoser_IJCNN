@@ -6,16 +6,16 @@ NUM_COORDS = 3
 NUM_DIMS = NUM_JOINTS * NUM_COORDS  # 78
 
 # Globals
-SEQLEN = 8
-MODELNAME = "RPPgaussianGaussian"
+SEQ_LEN = 8
+MODEL_NAME = "RPPgaussianGaussian"
 
 # Shared training defaults
 _BASE_CONFIG = {
-    "weightDecay": 0.0001,
+    "weight_decay": 0.0001,
     "optimizer": "adam",
     "device": "cuda",
     "betas": (0.9, 0.999),
-    "lrDecay": 0.99,
+    "lr_decay": 0.99,
     "nll": False,
     "evd": False,
     "nf": False,
@@ -25,47 +25,47 @@ _BASE_CONFIG = {
 # Per-model overrides (only keys that differ from _BASE_CONFIG)
 _MODEL_CONFIGS = {
     "RPPgaussianGaussian": {
-        "learningRate": 0.001, "epochs": 24, "batchSize": 16,
+        "learning_rate": 0.001, "epochs": 24, "batch_size": 16,
         "beta": 20, "gamma": 5, "nll": True,
     },
     "RPPgaussianGaussianCov": {
-        "learningRate": 0.001, "epochs": 24, "batchSize": 16,
+        "learning_rate": 0.001, "epochs": 24, "batch_size": 16,
         "beta": 20, "gamma": 5, "nll": True,
     },
     "RPPlaplaceLaplace": {
-        "learningRate": 0.001, "epochs": 24, "batchSize": 16,
+        "learning_rate": 0.001, "epochs": 24, "batch_size": 16,
         "beta": 1, "gamma": 1, "nll": True,
     },
     "RPPlaplaceGaussian": {
-        "learningRate": 0.001, "epochs": 24, "batchSize": 16,
+        "learning_rate": 0.001, "epochs": 24, "batch_size": 16,
         "beta": 1, "gamma": 5, "nll": True,
     },
     "RPPgaussianLaplace": {
-        "learningRate": 0.001, "epochs": 24, "batchSize": 16,
+        "learning_rate": 0.001, "epochs": 24, "batch_size": 16,
         "beta": 20, "gamma": 5, "nll": True,
     },
     "RPPevidential": {
-        "learningRate": 0.0001, "epochs": 24, "batchSize": 16,
+        "learning_rate": 0.0001, "epochs": 24, "batch_size": 16,
         "lambda": 0.001, "evd": True,
     },
     "RPPnormalizingFlow": {
-        "learningRate": 0.0001, "epochs": 24, "batchSize": 32,
+        "learning_rate": 0.0001, "epochs": 24, "batch_size": 32,
         "gamma": 1, "beta": 1, "nf": True,
     },
     "HoEtAlBaseline": {
-        "learningRate": 0.0001, "epochs": 40, "batchSize": 16,
+        "learning_rate": 0.0001, "epochs": 40, "batch_size": 16,
         "HR_SINGLE": True,
     },
 }
 
-if MODELNAME not in _MODEL_CONFIGS:
+if MODEL_NAME not in _MODEL_CONFIGS:
     raise ValueError(
-        f"Invalid MODELNAME: {MODELNAME}. "
+        f"Invalid MODEL_NAME: {MODEL_NAME}. "
         f"Valid options: {list(_MODEL_CONFIGS.keys())}"
     )
-TRAINCONFIG = {**_BASE_CONFIG, **_MODEL_CONFIGS[MODELNAME]}
+TRAIN_CONFIG = {**_BASE_CONFIG, **_MODEL_CONFIGS[MODEL_NAME]}
 
-# Model registry: maps MODELNAME to (module_name, class_name)
+# Model registry: maps MODEL_NAME to (module_name, class_name)
 MODEL_REGISTRY = {
     "RPPgaussianGaussian": ("radproposer_vae", "RadProPoserVAE"),
     "RPPgaussianGaussianCov": ("radproposer_vae_cov", "RadProPoserVAECov"),
@@ -78,13 +78,13 @@ MODEL_REGISTRY = {
 }
 
 # Paths
-PATHORIGIN = None  # Set this to your root path
-PATHRAW = None  # Set this to your raw radar data path
+PATH_ORIGIN = None  # Set this to your root path
+PATH_RAW = None  # Set this to your raw radar data path
 
-if PATHORIGIN is None:
-    raise ValueError("PATHORIGIN must be set in config.py")
-if PATHRAW is None:
-    raise ValueError("PATHRAW must be set in config.py")
+if PATH_ORIGIN is None:
+    raise ValueError("PATH_ORIGIN must be set in config.py")
+if PATH_RAW is None:
+    raise ValueError("PATH_RAW must be set in config.py")
 
-MODELPATH = os.path.join(PATHORIGIN, "models")
-HPECKPT = os.path.join(PATHORIGIN, "trainedModels", "humanPoseEstimation")
+MODEL_PATH = os.path.join(PATH_ORIGIN, "models")
+HP_ECKPT = os.path.join(PATH_ORIGIN, "trainedModels", "humanPoseEstimation")

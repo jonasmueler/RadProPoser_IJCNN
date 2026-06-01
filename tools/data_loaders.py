@@ -188,7 +188,7 @@ class RadarData(Dataset):
         for file_name in file_names:
             file_path = os.path.join(directory_path, file_name)
             file_index = int(os.path.splitext(file_name)[0])
-            tensor_dict[file_index] = torch.load(file_path)
+            tensor_dict[file_index] = torch.load(file_path, weights_only=True)
 
         print(f"Loaded {len(tensor_dict)} files into RAM.")
         return tensor_dict

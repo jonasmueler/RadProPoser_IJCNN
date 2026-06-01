@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from common import HighResolution3DNet, ResidualMLP, blocks_dict
+from common import HighResolution3DNet
 from hrnet3D_config import MODEL_CONFIGS
 from transformer import Transformer
 
@@ -84,7 +84,7 @@ class RadProPoserVAENF(nn.Module):
                 [0, 1] * (latent_dim // 2) if i % 2 == 0
                 else [1, 0] * (latent_dim // 2),
                 dtype=torch.float32,
-            ).to("cuda")
+            )
 
             s = MLP([latent_dim, latent_dim], output_fn="tanh")
             t = MLP([latent_dim, latent_dim], output_fn="tanh")
@@ -215,7 +215,7 @@ class RadProPoserVAENF(nn.Module):
             mu, logvar = self.get_latent(x)
             std = torch.exp(0.5 * logvar)
 
-            norm_scale = torch.randn_like(std).cuda()
+            norm_scale = torch.randn_like(std)
             z0 = mu + norm_scale * std
 
             zK, log_det = self.flows(z0)

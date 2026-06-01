@@ -1,7 +1,7 @@
 from pathlib import Path
 
 # Base paths
-PATHORIGIN = Path(__file__).parent
+PATH_ORIGIN = Path(__file__).parent
 DATA_DIR = None  # Set this to your HuPR data directory, e.g. Path("/path/to/HuPR")
 
 if DATA_DIR is None:
@@ -10,7 +10,7 @@ ANNOT_DIR = DATA_DIR / "annotations"
 RADAR_FULL_DIR = DATA_DIR / "radar_full"
 
 # MotionBERT configuration
-MOTIONBERT_DIR = PATHORIGIN / "MotionBERT"
+MOTIONBERT_DIR = PATH_ORIGIN / "MotionBERT"
 
 # Select model: "full" or "lite"
 # - "full": MB_ft_h36m (512 dim, rootrel=True, outputs root-relative poses directly)
@@ -36,7 +36,7 @@ MB_CHECKPOINT_PATH = MOTIONBERT_CONFIGS[MOTIONBERT_MODEL]["checkpoint"]
 MB_ROOTREL = MOTIONBERT_CONFIGS[MOTIONBERT_MODEL]["rootrel"]
 
 # HuPR model paths
-HUPR_CHECKPOINT_PATH = PATHORIGIN / "logs" / "hupr_pretrained" / "model_best.pth"
+HUPR_CHECKPOINT_PATH = PATH_ORIGIN / "logs" / "hupr_pretrained" / "model_best.pth"
 
 # Preprocessing configuration
 PREPROCESS_CONFIG = {
@@ -47,16 +47,16 @@ PREPROCESS_CONFIG = {
 }
 
 # Training configuration for RadProPoserVAECov model
-TRAINCONFIG = {
+TRAIN_CONFIG = {
     # Optimizer
-    "learningRate": 0.001,
-    "weightDecay": 0.0001,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0001,
     "betas": (0.9, 0.999),
-    "lrDecay": 0.99,
+    "lr_decay": 0.99,
 
     # Training
     "epochs": 50,
-    "batchSize": 16,
+    "batch_size": 16,
     "device": "cuda",
 
     # Loss weights
@@ -64,21 +64,21 @@ TRAINCONFIG = {
     "gamma": 5,     # Variance/covariance penalty weight
 
     # Model
-    "nSamples": 128,  # Number of ensemble samples for covariance estimation
+    "n_samples": 128,  # Number of ensemble samples for covariance estimation
 
     # Data
-    "seqLen": 8,
+    "seq_len": 8,
     "stride": 1,
-    "numWorkers": 8,
+    "num_workers": 8,
 
     # Experiment
     "name": "radproposer_cov_motionbert",
-    "useWandb": True,
+    "use_wandb": True,
     "resume": True,
 }
 
 # Testing configuration
-TESTCONFIG = {
+TEST_CONFIG = {
     "checkpoint_name": "radproposer_cov_motionbert",
     "device": "cuda",
     "batch_size": 16,

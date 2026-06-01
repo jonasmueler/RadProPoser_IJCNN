@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from edl_pytorch import NormalInvGamma
 
-from common import HighResolution3DNet, ResidualMLP, blocks_dict
+from common import HighResolution3DNet
 from hrnet3D_config import MODEL_CONFIGS
 from transformer import Transformer
 
@@ -180,13 +180,3 @@ class RadProPoserEvidential(nn.Module):
         samples = self.sample_aleatoric_from_output(out_uncertainty)
 
         return out_uncertainty, samples.permute(0, 2, 1)
-
-
-if __name__ == "__main__":
-    model = RadProPoserEvidential().float()
-
-    test_data = torch.rand(1, 8, 4, 4, 64, 128)
-    out = model.forward_inference(test_data)
-    out = model(test_data)
-
-    print(out[0][0].size())
