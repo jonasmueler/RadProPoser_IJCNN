@@ -176,6 +176,14 @@ python scripts/evaluate_3d.py
 
 ---
 
+## License
+
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0). You are free to use, share, and adapt this code for non-commercial purposes. See [LICENSE.txt](LICENSE.txt) for the full license text.
+
+For commercial licensing inquiries, please contact the authors.
+
+---
+
 ## Citation
 
 If you find this work useful, please cite:
