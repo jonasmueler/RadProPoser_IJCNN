@@ -10,7 +10,8 @@ from tqdm import tqdm
 
 from config import PATHORIGIN, TRAINCONFIG
 from datasets.dataset_full import get_dataloader
-from misc import KLLoss, compute_mpjpe, nll_from_cov
+from misc import kl_loss, compute_mpjpe, nll_from_cov
+from misc.constants import NUM_DIMS
 from models import RadProPoserVAECov
 
 
@@ -81,7 +82,7 @@ def validate(model: nn.Module, val_loader: DataLoader, device: str) -> float:
     with torch.no_grad():
         for batch in tqdm(val_loader, desc="Validation", unit="batch", mininterval=1.0):
             radar = batch["radar"].to(device).to(torch.complex64)
-            gt = batch["pose_3d"].to(device).float().reshape(-1, 17 * 3) * 100
+            gt = batch["pose_3d"].to(device).float().reshape(-1, NUM_DIMS) * 100
 
             _, _, _, preds, _ = model(radar)
             _, mpjpe = compute_mpjpe(preds, gt)
@@ -165,7 +166,7 @@ def train() -> None:
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}", unit="batch", mininterval=1.0)
         for batch_idx, batch in enumerate(pbar):
             radar = batch["radar"].to(device).to(torch.complex64)
-            gt = batch["pose_3d"].to(device).float().reshape(-1, 17 * 3) * 100  # to cm
+            gt = batch["pose_3d"].to(device).float().reshape(-1, NUM_DIMS) * 100  # to cm
 
             optimizer.zero_grad()
 
@@ -173,9 +174,9 @@ def train() -> None:
             _, mu, latent_spread, mu_out, cov = model(radar)
 
             # Compute losses
-            kl_loss = KLLoss(mu, latent_spread)
+            kl = kl_loss(mu, latent_spread)
             nll, pen = nll_from_cov(gt, mu_out, cov)
-            loss = nll + cfg["beta"] * kl_loss
+            loss = nll + cfg["beta"] * kl
 
             # Backward pass
             loss.backward()
@@ -184,17 +185,17 @@ def train() -> None:
 
             epoch_loss += loss.item()
             epoch_nll += nll.item()
-            epoch_kl += kl_loss.item()
+            epoch_kl += kl.item()
 
             # Update progress bar
-            pbar.set_postfix(loss=f"{loss.item():.3f}", nll=f"{nll.item():.3f}", kl=f"{kl_loss.item():.3f}")
+            pbar.set_postfix(loss=f"{loss.item():.3f}", nll=f"{nll.item():.3f}", kl=f"{kl.item():.3f}")
 
             # Log batch
             if cfg["useWandb"]:
                 wandb.log({
                     "train/loss": loss.item(),
                     "train/nll": nll.item(),
-                    "train/kl": kl_loss.item(),
+                    "train/kl": kl.item(),
                     "train/var_penalty": pen.item(),
                 })
 

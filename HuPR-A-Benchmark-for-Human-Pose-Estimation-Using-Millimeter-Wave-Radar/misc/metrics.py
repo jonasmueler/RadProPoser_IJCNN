@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from scipy.stats import norm
 
-from misc.constants import JOINT_NAMES
+from misc.constants import JOINT_NAMES, NUM_JOINTS
 
 
 def get_max_preds(batch_heatmaps: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -51,8 +51,8 @@ def compute_mpjpe(preds: torch.Tensor, targets: torch.Tensor) -> Tuple[torch.Ten
     Returns:
         Tuple of (per_joint_mpjpe, total_mpjpe) where per_joint is shape (17,)
     """
-    preds = preds.view(-1, 17, 3)
-    targets = targets.view(-1, 17, 3)
+    preds = preds.view(-1, NUM_JOINTS, 3)
+    targets = targets.view(-1, NUM_JOINTS, 3)
 
     diff = preds - targets
     dist = torch.norm(diff, dim=-1)
@@ -109,8 +109,8 @@ def compute_pa_mpjpe(preds: torch.Tensor, targets: torch.Tensor) -> Tuple[torch.
     Returns:
         Tuple of (per_joint_pa_mpjpe, total_pa_mpjpe) where per_joint is shape (17,)
     """
-    preds = preds.view(-1, 17, 3)
-    targets = targets.view(-1, 17, 3)
+    preds = preds.view(-1, NUM_JOINTS, 3)
+    targets = targets.view(-1, NUM_JOINTS, 3)
 
     aligned_preds = torch.stack([
         procrustes_align(tgt, pred) for pred, tgt in zip(preds, targets)
@@ -134,7 +134,7 @@ def compute_sharpness(variances: torch.Tensor) -> Tuple[torch.Tensor, torch.Tens
     Returns:
         Tuple of (per_joint_sharpness, total_sharpness) where per_joint is shape (17,)
     """
-    variances = variances.view(-1, 17, 3)
+    variances = variances.view(-1, NUM_JOINTS, 3)
     per_joint_var = variances.sum(dim=-1)
     per_joint = per_joint_var.mean(dim=0)
     total = per_joint.mean()

@@ -17,14 +17,14 @@ sys.path.append(MODELPATH)
 
 # model configurations
 MODELS = {
-    "RPPgaussianGaussian": {"class": "RadProPoserVAE", "module": "vae_lstm_ho", "single_frame": False},
-    "RPPlaplaceLaplace": {"class": "RadProPoserVAE", "module": "vae_lstm_ho", "single_frame": False},
-    "RPPlaplaceGaussian": {"class": "RadProPoserVAE", "module": "vae_lstm_ho", "single_frame": False},
-    "RPPgaussianLaplace": {"class": "RadProPoserVAE", "module": "vae_lstm_ho", "single_frame": False},
-    "RPPgaussianGaussianCov": {"class": "RadProPoserVAECov", "module": "vae_lstm_ho", "single_frame": False},
+    "RPPgaussianGaussian": {"class": "RadProPoserVAE", "module": "radproposer_vae", "single_frame": False},
+    "RPPlaplaceLaplace": {"class": "RadProPoserVAE", "module": "radproposer_vae", "single_frame": False},
+    "RPPlaplaceGaussian": {"class": "RadProPoserVAE", "module": "radproposer_vae", "single_frame": False},
+    "RPPgaussianLaplace": {"class": "RadProPoserVAE", "module": "radproposer_vae", "single_frame": False},
+    "RPPgaussianGaussianCov": {"class": "RadProPoserVAECov", "module": "radproposer_vae_cov", "single_frame": False},
     "RPPevidential": {"class": "RadProPoserEvidential", "module": "evidential_pose_regression", "single_frame": False},
     "RPPnormalizingFlow": {"class": "RadProPoserVAENF", "module": "normalizing_flow", "single_frame": False},
-    "HoEtAlBaseline": {"class": "HRRadarPose", "module": "vae_lstm_ho", "single_frame": True},
+    "HoEtAlBaseline": {"class": "HRRadarPose", "module": "ho_single_frame", "single_frame": True},
 }
 
 N_RUNS = 50

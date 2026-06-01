@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,13 +10,22 @@ from misc.metrics import get_max_preds
 from misc.utils import generateTarget
 
 
-def KLLoss(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
-    """KL divergence for VAE latent space regularization."""
-    klloss = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
-    return klloss
+def kl_loss(mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+    """Compute KL divergence between learned Gaussian posterior and standard normal prior.
+
+    Args:
+        mu: Latent mean tensor of shape (B, D).
+        logvar: Latent log-variance tensor of shape (B, D).
+
+    Returns:
+        Scalar KL divergence loss averaged over the batch.
+    """
+    return -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
 
 
-def nll_from_cov(gt: torch.Tensor, mu: torch.Tensor, cov: torch.Tensor):
+def nll_from_cov(
+    gt: torch.Tensor, mu: torch.Tensor, cov: torch.Tensor
+) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Negative log-likelihood using full covariance matrix.
 

@@ -1,3 +1,4 @@
+import importlib
 import os
 import sys
 
@@ -7,12 +8,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 from tqdm import tqdm
 
 import trainLoop
-from config import *
+from config import (
+    MODEL_REGISTRY, MODELNAME, MODELPATH, NUM_COORDS, NUM_DIMS, NUM_JOINTS,
+    PATHORIGIN, PATHRAW, SEQLEN, TRAINCONFIG,
+)
 
 def get_model_checkpoint_path(model_name: str, testing_epoch: int = None) -> str:
     """
@@ -80,8 +82,8 @@ class RadarPoseTester:
     @staticmethod
     def compute_mpjpe(preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False):
         """Compute Mean Per Joint Position Error (MPJPE) between predictions and targets."""
-        preds = preds.view(preds.size(0), 26, 3)
-        targets = targets.view(targets.size(0), 26, 3)
+        preds = preds.view(preds.size(0), NUM_JOINTS, NUM_COORDS)
+        targets = targets.view(targets.size(0), NUM_JOINTS, NUM_COORDS)
 
         diff = preds - targets
         dist = torch.norm(diff, dim=-1)
@@ -92,8 +94,8 @@ class RadarPoseTester:
     
     def compute_p_mpjpe(self, preds: torch.Tensor, targets: torch.Tensor, keypoints: bool = False):
         """Compute Procrustes-aligned MPJPE (P-MPJPE) after rigid alignment."""
-        preds = preds.view(preds.size(0), 26, 3)
-        targets = targets.view(targets.size(0), 26, 3)
+        preds = preds.view(preds.size(0), NUM_JOINTS, NUM_COORDS)
+        targets = targets.view(targets.size(0), NUM_JOINTS, NUM_COORDS)
 
         aligned_preds = torch.stack([
             self.procrustes_torch(tgt, pred) for pred, tgt in zip(preds, targets)
@@ -162,7 +164,7 @@ class RadarPoseTester:
         radar_tensor = torch.from_numpy(radar_npz[radar_npz.files[0]]).to(self.device).to(torch.complex64)
 
         skeleton_tensor = torch.from_numpy(np.load(skeleton_path)).float()
-        skeleton_tensor = skeleton_tensor.view(skeleton_tensor.shape[0], 26, 3) * 100
+        skeleton_tensor = skeleton_tensor.view(skeleton_tensor.shape[0], NUM_JOINTS, NUM_COORDS) * 100
 
         return radar_tensor, skeleton_tensor
 
@@ -222,9 +224,9 @@ class RadarPoseTester:
         preds = torch.cat(preds, dim=0)
         vars = torch.cat(vars, dim=0)
         if self.single_frame:
-            gts = target.reshape(-1, 26 * 3).to(self.device)
+            gts = target.reshape(-1, NUM_DIMS).to(self.device)
         else:
-            gts = target[self.seq_len:].reshape(-1, 26 * 3).to(self.device)
+            gts = target[self.seq_len:].reshape(-1, NUM_DIMS).to(self.device)
         
         if ensembles:
             ensembles = torch.cat(ensembles, dim=0)
@@ -296,7 +298,7 @@ class RadarPoseTester:
                     
                     preds_batches.append(preds)
 
-                    gts_batch = target[i:end].reshape(-1, 26 * 3).to(self.device)
+                    gts_batch = target[i:end].reshape(-1, NUM_DIMS).to(self.device)
                     gts_batches.append(gts_batch)
 
             preds = torch.cat(preds_batches, dim=0)
@@ -322,22 +324,12 @@ class RadarPoseTester:
     def run_evaluation(self, parts: list, angles: list, actions: list, reps: list, model_path: str):
         """Run full evaluation: load model, evaluate all combinations, save predictions and calibration data."""
         sys.path.append(MODELPATH)
-        
-        if MODELNAME in ("RPPgaussianGaussian", "RPPlaplaceLaplace", "RPPlaplaceGaussian", "RPPgaussianLaplace"):
-            from vae_lstm_ho import RadProPoserVAE as Encoder
-        elif MODELNAME == "RPPgaussianGaussianCov":
-            from vae_lstm_ho import RadProPoserVAECov as Encoder
-        elif MODELNAME == "RPPevidential":
-            from evidential_pose_regression import RadProPoserEvidential as Encoder
-        elif MODELNAME == "RPPnormalizingFlow":
-            from normalizing_flow import RadProPoserVAENF as Encoder
-        elif MODELNAME == "HoEtAlBaseline":
-            from vae_lstm_ho import HRRadarPose as Encoder
-        else:
-            raise ValueError(f"Invalid MODELNAME: {MODELNAME}. Check config.py for valid model names.")
+
+        module_name, class_name = MODEL_REGISTRY[MODELNAME]
+        Encoder = getattr(importlib.import_module(module_name), class_name)
 
         self.model = Encoder().to(self.device)
-        self.model = trainLoop.loadCheckpoint(self.model, None, model_path)
+        self.model = trainLoop.load_checkpoint(self.model, None, model_path)
         self.model.eval()
         all_preds, all_gts, all_vars, all_ensembles = [], [], [], []
         val_preds, val_gts, val_vars, val_ensembles = [], [], [], []

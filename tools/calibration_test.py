@@ -9,7 +9,7 @@ import numpy as np
 
 from calibration_analysis import MultiModelRecalibrationVisualizer as ParametricVisualizer
 from calibration_analysis_empirical import MultiModelRecalibrationVisualizer as EmpiricalVisualizer
-from config import MODELNAME
+from config import MODELNAME, NUM_DIMS
 
 MODELS = {
     "rppgaussiangaussian": {"type": "parametric", "laplace": False},
@@ -70,7 +70,7 @@ def main():
     mu_val, var_val, gt_val, ensemble_val, mu_test, var_test, gt_test, ensemble_test = load_data(model_suffix)
     
     if config["type"] == "parametric":
-        visualizer = ParametricVisualizer(num_dims=78)
+        visualizer = ParametricVisualizer(num_dims=NUM_DIMS)
         visualizer.quantify_improvement_with_holdout(
             mu_val, var_val, gt_val,
             mu_test, var_test, gt_test,
@@ -81,7 +81,7 @@ def main():
         if ensemble_val is None or ensemble_test is None:
             print(f"ERROR: Missing ensemble data for {MODELNAME}")
             return
-        visualizer = EmpiricalVisualizer(num_dims=78)
+        visualizer = EmpiricalVisualizer(num_dims=NUM_DIMS)
         visualizer.quantify_improvement_with_holdout(
             mu_val, var_val, gt_val, ensemble_val,
             mu_test, var_test, gt_test, ensemble_test,

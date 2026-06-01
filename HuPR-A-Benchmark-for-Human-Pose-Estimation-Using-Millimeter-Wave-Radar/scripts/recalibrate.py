@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPT_DIR.parent))
 
 from config import PATHORIGIN, TRAINCONFIG
 from datasets.dataset_full import get_dataloader
+from misc.constants import NUM_DIMS
 from models import RadProPoserVAECov
 from recalibration.recalibrator import HuPRRecalibrator
 
@@ -114,7 +115,7 @@ def run_inference(
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="Running inference", unit="batch"):
             radar = batch["radar"].to(DEVICE).to(torch.complex64)
-            gt = batch["pose_3d"].to(DEVICE).float().reshape(-1, 17 * 3) * 100
+            gt = batch["pose_3d"].to(DEVICE).float().reshape(-1, NUM_DIMS) * 100
 
             _, _, _, mu, cov = model(radar)
             var = cov.diagonal(dim1=-2, dim2=-1)

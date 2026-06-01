@@ -11,6 +11,8 @@ from scipy.stats import laplace, norm, pearsonr, t
 from sklearn.isotonic import IsotonicRegression
 from sklearn.model_selection import KFold
 
+from config import NUM_COORDS, NUM_JOINTS
+
 np.set_printoptions(suppress=True)
 
 class MultiModelRecalibrationVisualizer:
@@ -352,8 +354,8 @@ class MultiModelRecalibrationVisualizer:
         # --- Uncalibrated ---
         cdf_uncal = self._get_cdf(mu_test, np.sqrt(var_test), gt_test, laplace_)
         unc_error = self._compute_calibration_error(cdf_uncal)
-        unc_sharpness_vec = np.mean(np.sum(var_test.reshape(var_test.shape[0], 26, 3), axis = -1))  # per-dim average σ
-        unc_sharpness_vec_keys = np.mean(np.sum(var_test.reshape(var_test.shape[0], 26, 3), -1), axis = 0)
+        unc_sharpness_vec = np.mean(np.sum(var_test.reshape(var_test.shape[0], NUM_JOINTS, NUM_COORDS), axis = -1))  # per-dim average σ
+        unc_sharpness_vec_keys = np.mean(np.sum(var_test.reshape(var_test.shape[0], NUM_JOINTS, NUM_COORDS), -1), axis = 0)
         print(f"sharpness uncalibrated per keypoint", unc_sharpness_vec_keys)
         print(f"Calibration Error (Uncalibrated): {unc_error:.6f}")
         print(f"Sharpness (Uncalibrated): {unc_sharpness_vec}")
@@ -384,15 +386,16 @@ class MultiModelRecalibrationVisualizer:
                 sharpness_vec = np.stack(sharpness_vals, axis=0)
                 print(f"Sharpness Vector (Recalibrated - {model_type}) per keypoint:")
                 #print(np.sqrt(sharpness_vec))
-                print(np.sum(sharpness_vec.reshape( 26,3), axis = -1))
+                print(np.sum(sharpness_vec.reshape(NUM_JOINTS, NUM_COORDS), axis = -1))
                 
                 #print("mean ", np.mean(np.sqrt(sharpness_vec)))
                 print("Sharpness Calibrated: ")
-                print(np.mean(np.sum(sharpness_vec.reshape(26,3), axis = -1)))
+                print(np.mean(np.sum(sharpness_vec.reshape(NUM_JOINTS, NUM_COORDS), axis = -1)))
 
             else:
                 print(f"(Skipping sharpness: {model_type} is not a monotonic CDF model)")
 
+    @staticmethod
     def fast_nongaussian_moments(mu, sigma, recalibrator,
                              L=4, G=200, P=200):
         """Return (mean_cal, var_cal) via quantile‐integration."""
@@ -433,7 +436,7 @@ class MultiModelRecalibrationVisualizer:
         N, D = mu.shape
         mu_torch = torch.tensor(mu)
         gt_torch = torch.tensor(gt)
-        errors = torch.norm((mu_torch - gt_torch).view(N, 26, 3), dim=-1).numpy()  # shape (N, 26)
+        errors = torch.norm((mu_torch - gt_torch).view(N, NUM_JOINTS, NUM_COORDS), dim=-1).numpy()  # shape (N, 26)
 
         recalibrated_var = np.zeros((N, 26))
         for j in range(26):

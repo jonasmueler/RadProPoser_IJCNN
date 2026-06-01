@@ -6,7 +6,7 @@ from misc.constants import (
     NUM_JOINTS,
     TEST_SEQUENCES,
 )
-from misc.losses import KLLoss, nll_from_cov
+from misc.losses import kl_loss, nll_from_cov
 from misc.metrics import (
     compute_ece,
     compute_mpjpe,

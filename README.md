@@ -11,21 +11,39 @@ The folder structure of this repository is organized as follows:
 ```
 RadProPoser/
 ├── data/
-│   └── raw_radar_data/          # Our dataset (radar + skeletons)
-├── models/                       # Neural network architectures
-├── tools/                        # Training, testing, calibration scripts
-├── trainedModels/                # Pretrained model weights
-├── HuPR-.../                     # HuPR dataset experiments
-│   ├── config.py                 # Central configuration
-│   ├── train.py                  # RadProPoserVAECov training
-│   ├── test.py                   # Testing with uncertainty metrics
-│   ├── models/                   # Model architectures
-│   ├── datasets/                 # Data loaders
-│   ├── preprocessing/            # Radar processing, 3D GT generation
-│   ├── scripts/                  # Inference and evaluation
-│   ├── misc/                     # Losses, metrics, utilities
-│   ├── recalibration/            # Uncertainty recalibration
-│   └── MotionBERT/               # 2D-to-3D lifting model
+│   └── raw_radar_data/              # Our dataset (radar + skeletons)
+├── models/                           # Neural network architectures
+│   ├── common.py                     # Shared: HRNet backbone, ResidualMLP
+│   ├── radproposer_vae.py            # RadProPoserVAE (Gaussian/Laplace latent)
+│   ├── radproposer_vae_cov.py        # RadProPoserVAECov (full covariance)
+│   ├── ho_single_frame.py            # HRRadarPose (Ho et al. baseline)
+│   ├── evidential_pose_regression.py # RadProPoserEvidential (evidential DL)
+│   ├── normalizing_flow.py           # RadProPoserVAENF (normalizing flow)
+│   ├── transformer.py                # Transformer for temporal aggregation
+│   └── hrnet3D_config.py             # HRNet architecture configs
+├── tools/                            # Training, testing, calibration scripts
+│   ├── config.py                     # Central configuration + MODEL_REGISTRY
+│   ├── trainScript.py                # Training entry point
+│   ├── trainLoop.py                  # Training loop, checkpoint I/O
+│   ├── testing.py                    # Test set evaluation
+│   ├── losses.py                     # Loss functions (NLL, KL, Laplace)
+│   ├── metrics.py                    # MPJPE metric
+│   ├── dataLoaders.py                # Dataset and data loading
+│   ├── calibration_test.py           # Recalibration analysis
+│   ├── calibration_analysis.py       # Calibration metrics
+│   └── inference_time.py             # Inference benchmarking
+├── trainedModels/                    # Pretrained model weights
+├── HuPR-.../                         # HuPR dataset experiments
+│   ├── config.py                     # Central configuration
+│   ├── train.py                      # RadProPoserVAECov training
+│   ├── test.py                       # Testing with uncertainty metrics
+│   ├── models/                       # Model architectures
+│   ├── datasets/                     # Data loaders
+│   ├── preprocessing/                # Radar processing, 3D GT generation
+│   ├── scripts/                      # Inference and evaluation
+│   ├── misc/                         # Losses, metrics, utilities
+│   ├── recalibration/                # Uncertainty recalibration
+│   └── MotionBERT/                   # 2D-to-3D lifting model
 └── requirements.txt
 ```
 
