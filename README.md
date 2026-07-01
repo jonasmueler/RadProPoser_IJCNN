@@ -189,10 +189,10 @@ For commercial licensing inquiries, please contact the authors.
 If you find this work useful, please cite:
 
 ```bibtex
-@inproceedings{mueller2025radproposer,
-  title={RadProPoser: Probabilistic Radar Tensor Human Pose Estimation That Knows Its Limits},
-  author={Mueller, Jonas Leo and Engel, Lukas and Dorschky, Eva and Krauss, Daniel and Ullmann, Ingrid and Vossiek, Martin and Eskofier, Bjoern M.},
-  booktitle={International Joint Conference on Neural Networks (IJCNN)},
+@article{mueller2025radproposer,
+  title={RadProPoser: A Framework for Human Pose Estimation with Uncertainty Quantification from Raw Radar Data},
+  author={Mueller, Jonas Leo and Engel, Lukas and Dorschky, Eva and Krauss, Daniel and Ullmann, Ingrid and Vossiek, Martin and Eskofier, Bjoern M},
+  journal={arXiv preprint arXiv:2508.03578},
   year={2025}
 }
 ```
