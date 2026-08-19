@@ -74,6 +74,8 @@ To get started with the project, follow the steps below:
 4. **Download data**:
    Our data can be downloaded anonymously here: https://doi.org/10.5281/zenodo.14035103. Place our dataset in the `data/` folder.
 
+> **Note on the dataset format:** The radar cubes in the Zenodo archive (`data_cube_parsed_*.npz`, shape `(frames, azimuth=4, elevation=4, range=64, chirps=128)`) are stored with the **range FFT already applied** along the range axis. The models in this repository expect raw ADC data, because the full 4D FFT is part of every forward pass by design. The data loader therefore applies an inverse FFT along the range axis (`np.fft.ifft(radar, axis=-2)` in `tools/data_loaders.py`) when generating training sequences, which exactly restores the raw fast-time samples — the stored spectrum is unwindowed and unnormalized, so this inversion is lossless. No manual preprocessing is required. If you use the dataset in your own pipeline, be aware of the pre-applied range FFT; and if you generated training sequences with an earlier version of this code, delete the generated `train`/`val`/`test` folders so they are rebuilt with the corrected data.
+
 ---
 
 ## Radar-based Human Pose Estimation

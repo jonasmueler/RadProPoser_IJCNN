@@ -120,6 +120,10 @@ class RadarData(Dataset):
             print("processing path ", path)
             data = np.load(path)
             radar = data[data.files[0]]
+            # The published dataset (Zenodo) ships with the range FFT already
+            # applied along axis -2. Invert it so the models' pre_process
+            # receives raw ADC data as assumed by the in-model 4D FFT.
+            radar = np.fft.ifft(radar, axis=-2)
 
             target_path = os.path.join(
                 self.root_path, "skeletons",
