@@ -87,9 +87,9 @@ class RadarData(Dataset):
         recordings = ["r0", "r1"]
 
         if self.mode == "train":
-            participants = ["p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11"]
+            participants = ["p3", "p4", "p6", "p7", "p8", "p9", "p10", "p11"]
         elif self.mode == "val":
-            participants = ["p3"]
+            participants = ["p5"]
         elif self.mode == "test":
             participants = ["p1", "p2", "p12"]
         else:
@@ -120,11 +120,6 @@ class RadarData(Dataset):
             print("processing path ", path)
             data = np.load(path)
             radar = data[data.files[0]]
-            # The published dataset (Zenodo) ships with the range FFT already
-            # applied along axis -2. Invert it so the models' pre_process
-            # receives raw ADC data as assumed by the in-model 4D FFT.
-            radar = np.fft.ifft(radar, axis=-2)
-
             target_path = os.path.join(
                 self.root_path, "skeletons",
                 "skeleton_" + "_".join(combination) + ".npy",
