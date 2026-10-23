@@ -7,7 +7,7 @@ NUM_DIMS = NUM_JOINTS * NUM_COORDS  # 78
 
 # Globals
 SEQ_LEN = 8
-MODEL_NAME = "RPPgaussianGaussian"
+MODEL_NAME = "RPPgaussianGaussianCov"
 
 # Shared training defaults
 _BASE_CONFIG = {
